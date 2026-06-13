@@ -1,0 +1,536 @@
+{
+  "SQL": {
+    "aliases": ["sql"],
+    "group": "Programming"
+  },
+  "Python": {
+    "aliases": ["python"],
+    "group": "Programming"
+  },
+  "R": {
+    "aliases": ["r programming", "r language", "rlang"],
+    "group": "Programming"
+  },
+  "Java": {
+    "aliases": ["java"],
+    "group": "Programming"
+  },
+  "JavaScript": {
+    "aliases": ["javascript", "js", "node.js", "nodejs"],
+    "group": "Programming"
+  },
+  "TypeScript": {
+    "aliases": ["typescript", "ts"],
+    "group": "Programming"
+  },
+  "Scala": {
+    "aliases": ["scala"],
+    "group": "Programming"
+  },
+  "Go": {
+    "aliases": ["golang", "go language"],
+    "group": "Programming"
+  },
+  "C++": {
+    "aliases": ["c++", "cpp"],
+    "group": "Programming"
+  },
+  "C#": {
+    "aliases": ["c#", "csharp", "c sharp"],
+    "group": "Programming"
+  },
+  "Bash": {
+    "aliases": ["bash", "shell scripting", "bash scripting", "shell script"],
+    "group": "Programming"
+  },
+  "Power BI": {
+    "aliases": ["power bi", "powerbi"],
+    "group": "Data & BI"
+  },
+  "Tableau": {
+    "aliases": ["tableau"],
+    "group": "Data & BI"
+  },
+  "Looker": {
+    "aliases": ["looker", "looker studio", "google looker"],
+    "group": "Data & BI"
+  },
+  "Excel": {
+    "aliases": ["excel", "microsoft excel", "ms excel"],
+    "group": "Data & BI"
+  },
+  "DAX": {
+    "aliases": ["dax"],
+    "group": "Data & BI"
+  },
+  "Power Query": {
+    "aliases": ["power query", "m language", "powerquery"],
+    "group": "Data & BI"
+  },
+  "Dashboarding": {
+    "aliases": ["dashboarding", "dashboard", "dashboards"],
+    "group": "Data & BI"
+  },
+  "Data Visualisation": {
+    "aliases": ["data visualisation", "data visualization", "visualisation", "visualization"],
+    "group": "Data & BI"
+  },
+  "Data Storytelling": {
+    "aliases": ["data storytelling", "storytelling with data", "storytelling"],
+    "group": "Data & BI"
+  },
+  "KPI Reporting": {
+    "aliases": ["kpi reporting", "kpi dashboards", "kpi metrics", "kpi"],
+    "group": "Data & BI"
+  },
+  "Self-Service BI": {
+    "aliases": ["self-service bi", "self-service analytics", "self-service reporting", "self service bi", "self service analytics", "self service reporting", "self-service"],
+    "group": "Data & BI"
+  },
+  "Insights": {
+    "aliases": ["insights", "data insights", "business insights"],
+    "group": "Data & BI"
+  },
+  "Reporting": {
+    "aliases": ["reporting", "business reporting", "management reporting", "report development"],
+    "group": "Data & BI"
+  },
+  "Qlik": {
+    "aliases": ["qlik", "qliksense", "qlik sense", "qlikview"],
+    "group": "Data & BI"
+  },
+  "MicroStrategy": {
+    "aliases": ["microstrategy", "mstr"],
+    "group": "Data & BI"
+  },
+  "SSRS": {
+    "aliases": ["ssrs", "sql server reporting services"],
+    "group": "Data & BI"
+  },
+  "Google Analytics": {
+    "aliases": ["google analytics", "ga4", "google analytics 4", "universal analytics"],
+    "group": "Data & BI"
+  },
+  "Metabase": {
+    "aliases": ["metabase"],
+    "group": "Data & BI"
+  },
+  "ETL": {
+    "aliases": ["etl", "elt", "extract transform load", "extract, transform, load", "extract-transform-load"],
+    "group": "Data Engineering"
+  },
+  "Data Pipelines": {
+    "aliases": ["data pipeline", "data pipelines", "data ingestion", "data integration"],
+    "group": "Data Engineering"
+  },
+  "Data Modelling": {
+    "aliases": ["data modelling", "data modeling", "dimensional model", "dimensional models", "dimensional modeling", "dimensional modelling", "star schema", "snowflake schema"],
+    "group": "Data Engineering"
+  },
+  "Data Warehousing": {
+    "aliases": ["data warehouse", "data warehousing", "dwh", "edw", "enterprise data warehouse"],
+    "group": "Data Engineering"
+  },
+  "Data Quality": {
+    "aliases": ["data quality", "data quality checks", "data validation", "data integrity"],
+    "group": "Data Engineering"
+  },
+  "Data Cleaning": {
+    "aliases": ["data cleaning", "data cleansing", "data wrangling", "data munging"],
+    "group": "Data Engineering"
+  },
+  "Data Governance": {
+    "aliases": ["data governance", "data stewardship", "data management", "master data management", "mdm"],
+    "group": "Data Engineering"
+  },
+  "Data Migration": {
+    "aliases": ["data migration", "data migration and reconciliation"],
+    "group": "Data Engineering"
+  },
+  "Reconciliation": {
+    "aliases": ["reconciliation", "data reconciliation", "reconcile"],
+    "group": "Data Engineering"
+  },
+  "Automation": {
+    "aliases": ["automation", "automated", "automate"],
+    "group": "Data Engineering"
+  },
+  "Azure Data Factory": {
+    "aliases": ["azure data factory", "adf"],
+    "group": "Data Engineering"
+  },
+  "Azure Databricks": {
+    "aliases": ["azure databricks", "databricks"],
+    "group": "Data Engineering"
+  },
+  "Apache Spark": {
+    "aliases": ["apache spark", "spark", "pyspark"],
+    "group": "Data Engineering"
+  },
+  "Kafka": {
+    "aliases": ["kafka", "apache kafka"],
+    "group": "Data Engineering"
+  },
+  "Airflow": {
+    "aliases": ["airflow", "apache airflow"],
+    "group": "Data Engineering"
+  },
+  "dbt": {
+    "aliases": ["dbt", "data build tool"],
+    "group": "Data Engineering"
+  },
+  "Snowflake": {
+    "aliases": ["snowflake"],
+    "group": "Data Engineering"
+  },
+  "BigQuery": {
+    "aliases": ["bigquery", "google bigquery", "bq"],
+    "group": "Data Engineering"
+  },
+  "Redshift": {
+    "aliases": ["redshift", "amazon redshift", "aws redshift"],
+    "group": "Data Engineering"
+  },
+  "AWS": {
+    "aliases": ["aws", "amazon web services"],
+    "group": "Data Engineering"
+  },
+  "GCP": {
+    "aliases": ["gcp", "google cloud", "google cloud platform"],
+    "group": "Data Engineering"
+  },
+  "Azure": {
+    "aliases": ["azure", "microsoft azure"],
+    "group": "Data Engineering"
+  },
+  "Docker": {
+    "aliases": ["docker", "containerisation", "containerization", "containers"],
+    "group": "Data Engineering"
+  },
+  "Kubernetes": {
+    "aliases": ["kubernetes", "k8s"],
+    "group": "Data Engineering"
+  },
+  "Git": {
+    "aliases": ["git", "github", "gitlab", "version control", "source control"],
+    "group": "Data Engineering"
+  },
+  "Linux": {
+    "aliases": ["linux", "unix", "ubuntu", "centos", "rhel"],
+    "group": "Data Engineering"
+  },
+  "Terraform": {
+    "aliases": ["terraform", "infrastructure as code", "iac"],
+    "group": "Data Engineering"
+  },
+  "SSIS": {
+    "aliases": ["ssis", "sql server integration services"],
+    "group": "Data Engineering"
+  },
+  "Talend": {
+    "aliases": ["talend"],
+    "group": "Data Engineering"
+  },
+  "Informatica": {
+    "aliases": ["informatica"],
+    "group": "Data Engineering"
+  },
+  "PostgreSQL": {
+    "aliases": ["postgresql", "postgres"],
+    "group": "Data Engineering"
+  },
+  "MySQL": {
+    "aliases": ["mysql"],
+    "group": "Data Engineering"
+  },
+  "SQL Server": {
+    "aliases": ["sql server", "mssql", "microsoft sql server", "t-sql", "tsql"],
+    "group": "Data Engineering"
+  },
+  "Oracle": {
+    "aliases": ["oracle", "oracle sql", "oracle database", "pl/sql", "plsql"],
+    "group": "Data Engineering"
+  },
+  "MongoDB": {
+    "aliases": ["mongodb", "mongo"],
+    "group": "Data Engineering"
+  },
+  "Elasticsearch": {
+    "aliases": ["elasticsearch", "elastic search", "opensearch"],
+    "group": "Data Engineering"
+  },
+  "Redis": {
+    "aliases": ["redis"],
+    "group": "Data Engineering"
+  },
+  "Machine Learning": {
+    "aliases": ["machine learning", "ml models", "ml pipeline"],
+    "group": "Data Science"
+  },
+  "Deep Learning": {
+    "aliases": ["deep learning", "neural network", "neural networks", "neural net"],
+    "group": "Data Science"
+  },
+  "NLP": {
+    "aliases": ["nlp", "natural language processing", "text analytics", "text mining"],
+    "group": "Data Science"
+  },
+  "Statistical Analysis": {
+    "aliases": ["statistical analysis", "statistical modelling", "statistical modeling", "statistics"],
+    "group": "Data Science"
+  },
+  "A/B Testing": {
+    "aliases": ["a/b testing", "ab testing", "a/b test", "experiment design", "hypothesis testing"],
+    "group": "Data Science"
+  },
+  "Forecasting": {
+    "aliases": ["forecasting", "demand forecasting", "load forecasting", "predictive forecasting", "time series forecasting"],
+    "group": "Data Science"
+  },
+  "Predictive Analytics": {
+    "aliases": ["predictive analytics", "predictive modelling", "predictive modeling"],
+    "group": "Data Science"
+  },
+  "Feature Engineering": {
+    "aliases": ["feature engineering", "feature selection", "feature extraction"],
+    "group": "Data Science"
+  },
+  "Model Deployment": {
+    "aliases": ["model deployment", "model serving", "model productionisation", "model productionization", "mlops"],
+    "group": "Data Science"
+  },
+  "Scikit-learn": {
+    "aliases": ["scikit-learn", "sklearn"],
+    "group": "Data Science"
+  },
+  "TensorFlow": {
+    "aliases": ["tensorflow", "tf", "keras"],
+    "group": "Data Science"
+  },
+  "PyTorch": {
+    "aliases": ["pytorch", "torch"],
+    "group": "Data Science"
+  },
+  "Pandas": {
+    "aliases": ["pandas"],
+    "group": "Data Science"
+  },
+  "NumPy": {
+    "aliases": ["numpy"],
+    "group": "Data Science"
+  },
+  "Time Series": {
+    "aliases": ["time series", "time-series", "temporal analysis"],
+    "group": "Data Science"
+  },
+  "Computer Vision": {
+    "aliases": ["computer vision", "image recognition", "object detection", "cv"],
+    "group": "Data Science"
+  },
+  "Recommendation Systems": {
+    "aliases": ["recommendation system", "recommendation engine", "recommender system", "collaborative filtering"],
+    "group": "Data Science"
+  },
+  "SAS": {
+    "aliases": ["sas", "sas analytics"],
+    "group": "Data Science"
+  },
+  "SPSS": {
+    "aliases": ["spss", "ibm spss"],
+    "group": "Data Science"
+  },
+  "Alteryx": {
+    "aliases": ["alteryx"],
+    "group": "Data Science"
+  },
+  "Stakeholder Management": {
+    "aliases": ["stakeholder management", "business partnering", "stakeholder engagement", "stakeholder communication"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "Requirements Gathering": {
+    "aliases": ["requirements gathering", "requirements elicitation", "requirements workshops", "business requirements"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "Process Mapping": {
+    "aliases": ["process mapping", "process maps", "process documentation", "process analysis", "process improvement"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "UAT": {
+    "aliases": ["uat", "user acceptance testing", "acceptance testing"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "User Stories": {
+    "aliases": ["user stories", "user story"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "Documentation": {
+    "aliases": ["documentation", "technical documentation"],
+    "group": "Business Delivery",
+    "soft": true
+  },
+  "Agile/Scrum": {
+    "aliases": ["agile", "scrum", "agile/scrum", "agile scrum", "sprint"],
+    "group": "Business Delivery"
+  },
+  "Jira": {
+    "aliases": ["jira", "jira boards"],
+    "group": "Business Delivery"
+  },
+  "Confluence": {
+    "aliases": ["confluence"],
+    "group": "Business Delivery"
+  },
+  "Project Management": {
+    "aliases": ["project management", "project delivery", "project coordination"],
+    "group": "Business Delivery"
+  },
+  "Change Management": {
+    "aliases": ["change management", "organisational change", "organizational change"],
+    "group": "Business Delivery"
+  },
+  "Risk Management": {
+    "aliases": ["risk management", "risk assessment", "risk analysis"],
+    "group": "Business Delivery"
+  },
+  "Vendor Management": {
+    "aliases": ["vendor management", "supplier management", "third-party management"],
+    "group": "Business Delivery"
+  },
+  "Communication": {
+    "aliases": ["communication", "written communication", "verbal communication", "presentation skills"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Collaboration": {
+    "aliases": ["collaboration", "collaborative", "cross-functional collaboration", "teamwork"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Problem Solving": {
+    "aliases": ["problem solving", "problem-solving", "analytical thinking", "critical thinking"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Attention to Detail": {
+    "aliases": ["attention to detail", "detail-oriented", "detail oriented"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Leadership": {
+    "aliases": ["leadership", "team leadership", "people management", "line management"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Mentoring": {
+    "aliases": ["mentoring", "mentorship", "coaching", "upskilling"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Time Management": {
+    "aliases": ["time management", "prioritisation", "prioritization", "workload management"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Adaptability": {
+    "aliases": ["adaptability", "adaptable", "flexibility", "flexible"],
+    "group": "Soft Skills",
+    "soft": true
+  },
+  "Financial Analysis": {
+    "aliases": ["financial analysis", "financial modelling", "financial modeling", "financial reporting"],
+    "group": "Finance & Commercial"
+  },
+  "Budgeting": {
+    "aliases": ["budgeting", "budget management", "budget planning", "budget tracking"],
+    "group": "Finance & Commercial"
+  },
+  "Variance Analysis": {
+    "aliases": ["variance analysis", "budget vs actual", "actuals vs budget"],
+    "group": "Finance & Commercial"
+  },
+  "Commercial Analytics": {
+    "aliases": ["commercial analytics", "commercial analysis", "commercial reporting"],
+    "group": "Finance & Commercial"
+  },
+  "Marketing Analytics": {
+    "aliases": ["marketing analytics", "campaign analytics", "campaign analysis", "digital analytics"],
+    "group": "Finance & Commercial"
+  },
+  "Customer Analytics": {
+    "aliases": ["customer analytics", "customer insights", "customer segmentation", "churn analysis", "churn prediction"],
+    "group": "Finance & Commercial"
+  },
+  "Pricing Analytics": {
+    "aliases": ["pricing analytics", "pricing optimisation", "pricing optimization", "price modelling"],
+    "group": "Finance & Commercial"
+  },
+  "Supply Chain Analytics": {
+    "aliases": ["supply chain analytics", "supply chain analysis", "logistics analytics", "inventory optimisation", "inventory optimization"],
+    "group": "Finance & Commercial"
+  },
+  "UI/UX": {
+    "aliases": ["ui/ux", "ux design", "user experience", "user interface design", "figma", "sketch"],
+    "group": "Design & Product"
+  },
+  "Product Analytics": {
+    "aliases": ["product analytics", "product metrics", "product data", "product insights"],
+    "group": "Design & Product"
+  },
+  "Product Management": {
+    "aliases": ["product management", "product owner", "product ownership"],
+    "group": "Design & Product"
+  },
+  "API Development": {
+    "aliases": ["api", "rest api", "restful api", "api development", "api integration", "api design"],
+    "group": "Programming"
+  },
+  "Microservices": {
+    "aliases": ["microservices", "microservice architecture", "service-oriented architecture", "soa"],
+    "group": "Programming"
+  },
+  "CI/CD": {
+    "aliases": ["ci/cd", "cicd", "continuous integration", "continuous deployment", "continuous delivery", "devops"],
+    "group": "Data Engineering"
+  },
+  "Data Lakehouse": {
+    "aliases": ["data lakehouse", "data lake", "data lake house", "lake house"],
+    "group": "Data Engineering"
+  },
+  "Vector Database": {
+    "aliases": ["vector database", "vector store", "vector db", "pinecone", "weaviate", "chroma"],
+    "group": "Data Engineering"
+  },
+  "Generative AI": {
+    "aliases": ["generative ai", "gen ai", "genai", "llm", "large language model", "openai", "chatgpt", "gpt"],
+    "group": "Data Science"
+  },
+  "Topic Modelling": {
+    "aliases": ["topic modelling", "topic modeling", "lda", "latent dirichlet allocation"],
+    "group": "Data Science"
+  },
+  "Power Automate": {
+    "aliases": ["power automate", "power apps", "ms power platform", "microsoft power platform"],
+    "group": "Data & BI"
+  },
+  "SAP": {
+    "aliases": ["sap", "sap hana", "sap bw", "sap analytics cloud"],
+    "group": "Data & BI"
+  },
+  "Salesforce": {
+    "aliases": ["salesforce", "sfdc", "crm"],
+    "group": "Business Delivery"
+  },
+  "Azure Synapse": {
+    "aliases": ["azure synapse", "synapse analytics", "azure synapse analytics"],
+    "group": "Data Engineering"
+  },
+  "dbt Cloud": {
+    "aliases": ["dbt cloud"],
+    "group": "Data Engineering"
+  }
+}

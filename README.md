@@ -37,9 +37,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # 1. Tell Northstar who you are and what you want
-cp skills.example.json skills.json      # the skills you HAVE vs the ones you LACK
+python build_profile.py --resume path/to/your_resume.docx   # generates skills.json
+# …then open skills.json and review the supported_skills list
 cp config.example.json config.json      # target roles, location, recency, work-rights
-# …then edit both files in your editor.
+# …then edit config.json in your editor
 
 # 2. Build your ranked board
 python 00_search_linkedin_guest.py      # find postings for your target roles
@@ -55,11 +56,55 @@ python score_jobs.py                    # writes matched_jobs.csv (your Fit %)
 
 - **`skills.json`** — `supported_skills` (everything you can genuinely claim) and
   `unsupported_skills` (tools you don't have). These drive your Fit %. Each entry lists
-  aliases so spelling/phrasing variants in a JD still match. Start from
-  `skills.example.json` and edit — ~20 skills you have and ~10 you lack is plenty.
+  aliases so spelling/phrasing variants in a JD still match.
+
+  **Quickest way:** run the profile generator (see "Building your skill profile" below)
+  instead of hand-editing.
+
 - **`config.json`** — your identity line, `target_keywords` (roles to search),
   `target_location`, `recency_tpr` (`r86400` = 24h), and matching options
   (`needs_sponsorship`, `seniority_cap`, `keep_threshold`).
+
+  Copy and fill in the identity block:
+
+  ```bash
+  cp config.example.json config.json   # then edit name, contact, target roles
+  ```
+
+### Building your skill profile
+
+Instead of hand-authoring `skills.json`, generate it from your résumé:
+
+```bash
+python build_profile.py --resume path/to/your_resume.docx
+```
+
+Then open `skills.json` and review the `supported_skills` section — add any skills the
+matcher missed, and remove any false positives. The `unsupported_skills` section lists
+everything in the taxonomy that was **not** found on your résumé; these are tracked as
+skill gaps and lower your Fit % when a JD requires them.
+
+**Supported input formats:**
+- `.docx` — recommended (preserves paragraph and table text cleanly)
+- `.md` / `.txt` — read directly
+- `.pdf` — requires `pip install pypdf`; if pypdf is not installed, paste text via
+  `--text "..."` or pass text on stdin instead
+
+**Optional LLM pass** (catches skills the deterministic matcher may miss):
+
+```bash
+python build_profile.py --resume resume.docx --llm
+```
+
+Requires `LLM_API_KEY` in `.env`. If the key is missing or the call fails, the script
+falls back to the deterministic result and prints a warning. The LLM is never
+required — the deterministic matcher alone covers ~150-250 labelled skills across
+Programming, Data & BI, Data Engineering, Data Science, Business Delivery, Soft
+Skills, and Finance & Commercial.
+
+**Taxonomy:** the shipped `taxonomy.json` is the universe of recognisable skills.
+If the generator prints "consider adding to taxonomy", you can extend `taxonomy.json`
+with new labels using the same shape as the existing entries.
 
 ## How scoring works
 
