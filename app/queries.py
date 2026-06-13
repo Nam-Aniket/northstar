@@ -1,0 +1,345 @@
+"""Read/write helpers over control_panel.db for the web app."""
+from __future__ import annotations
+
+import datetime
+import html as _html
+import re
+
+from app import db
+
+
+def _now() -> str:
+    return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+JOB_SELECT = """
+SELECT j.*,
+       s.starred, s.dismissed, s.notes, s.applied_at,
+       a.status AS app_status,
+       r.resume_file, r.cover_letter_file, r.self_check_match_rate,
+       r.self_check_passes_target, r.hard_coverage_pct, r.quantified_bullets,
+       r.word_count, r.jd_terms_missing, r.genuine_gaps, r.role_family,
+       js.first_seen_date
+FROM jobs j
+LEFT JOIN app_state s          ON j.row_key = s.row_key
+LEFT JOIN application_status a ON j.row_key = a.row_key
+LEFT JOIN resume_packages r    ON j.row_key = r.row_key
+LEFT JOIN job_seen js          ON j.row_key = js.row_key
+"""
+
+STATUS_FLOW = ["new", "applied", "phone_screen", "interview", "offer", "rejected", "closed"]
+PERSON_STATUS_FLOW = ["not_contacted", "contacted", "followup_due", "replied", "closed"]
+
+
+def normalize_company(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "").lower()).strip()
+
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def _shape(r) -> dict:
+    d = dict(r)
+    score = d.get("match_score") or 0
+    d["applied"] = bool(d.get("applied_at"))
+    d["starred"] = bool(d.get("starred"))
+    d["dismissed"] = bool(d.get("dismissed"))
+    d["has_resume"] = bool(d.get("resume_file"))
+    d["notes"] = d.get("notes") or ""
+    d["score_tone"] = "high" if score >= 75 else ("mid" if score >= 55 else "low")
+    d["status"] = d.get("app_status") or ("applied" if d["applied"] else "new")
+    d["evidence_list"] = [t.strip() for t in (d.get("matched_evidence") or "").split(";") if t.strip()]
+    d["gaps_list"] = [t.strip() for t in (d.get("gaps") or "").split(";") if t.strip()]
+    d["missing_list"] = [t.strip() for t in (d.get("jd_terms_missing") or "").split(",") if t.strip()]
+    d["low_confidence"] = (d.get("confidence") == "low")
+    d["unclassified_list"] = [t.strip() for t in (d.get("unclassified_requirements") or "").split(";") if t.strip()]
+    # job_day: prefer jd_posted_date if it's a valid YYYY-MM-DD, else first_seen_date, else ""
+    jd_posted = d.get("jd_posted_date") or ""
+    first_seen = d.get("first_seen_date") or ""
+    if jd_posted and _DATE_RE.match(jd_posted):
+        d["job_day"] = jd_posted[:10]
+    elif first_seen:
+        d["job_day"] = first_seen[:10]
+    else:
+        d["job_day"] = ""
+    return d
+
+
+def get_jobs(con, q=None, sector=None, min_score=0, status=None,
+             show_dismissed=False, starred_only=False, view=None, day=None) -> list[dict]:
+    rows = [_shape(r) for r in con.execute(JOB_SELECT).fetchall()]
+    out = []
+    for d in rows:
+        if d.get("match_score") is None:
+            continue  # unscored = dropped by the scorer (Fit below keep threshold)
+        # view filter
+        if view == "to_review":
+            if d["applied"] or d["dismissed"]:
+                continue
+        elif view == "applied":
+            if not d["applied"]:
+                continue
+        elif view == "starred":
+            if not d["starred"]:
+                continue
+        # dismissed filter (applies unless view already handled it)
+        if view not in ("applied", "starred"):
+            if not show_dismissed and d["dismissed"]:
+                continue
+        else:
+            if not show_dismissed and d["dismissed"]:
+                continue
+        # day filter
+        if day and day != "all":
+            if d["job_day"] != day:
+                continue
+        # other filters
+        if starred_only and not d["starred"]:
+            continue
+        if min_score and (d["match_score"] or 0) < int(min_score):
+            continue
+        if sector and d.get("sector") != sector:
+            continue
+        if status and d["status"] != status:
+            continue
+        if q:
+            hay = f"{d.get('company','')} {d.get('role_title','')} {d.get('location','')} {d.get('sector','')}".lower()
+            if q.lower() not in hay:
+                continue
+        out.append(d)
+    out.sort(key=lambda d: (d["match_score"] or 0, d["starred"]), reverse=True)
+    return out
+
+
+def available_days(con) -> list[str]:
+    """Return distinct non-empty job_day values across all jobs, sorted descending."""
+    rows = [_shape(r) for r in con.execute(JOB_SELECT).fetchall()]
+    seen = set()
+    for d in rows:
+        day = d.get("job_day", "")
+        if day:
+            seen.add(day)
+    return sorted(seen, reverse=True)
+
+
+def unapply(con, row_key):
+    _ensure(con, row_key)
+    now = _now()
+    con.execute("UPDATE app_state SET applied_at=NULL, updated_at=? WHERE row_key=?", (now, row_key))
+    con.execute("DELETE FROM application_status WHERE row_key=?", (row_key,))
+    _event(con, row_key, "unapplied")
+    con.commit()
+
+
+def get_job(con, row_key) -> dict | None:
+    r = con.execute(JOB_SELECT + " WHERE j.row_key = ?", (row_key,)).fetchone()
+    return _shape(r) if r else None
+
+
+def sectors(con) -> list[dict]:
+    return [dict(r) for r in con.execute(
+        "SELECT sector, COUNT(*) c FROM jobs GROUP BY sector ORDER BY c DESC")]
+
+
+def stats(con) -> dict:
+    g = lambda s, *a: con.execute(s, a).fetchone()[0]
+    total = g("SELECT COUNT(*) FROM jobs WHERE match_score IS NOT NULL")
+    applied = g("SELECT COUNT(*) FROM app_state WHERE applied_at IS NOT NULL")
+    dismissed = g("SELECT COUNT(*) FROM app_state WHERE dismissed = 1")
+    starred = g("SELECT COUNT(*) FROM app_state WHERE starred = 1")
+    return {"total": total, "applied": applied, "dismissed": dismissed,
+            "starred": starred, "to_review": max(total - applied - dismissed, 0)}
+
+
+def _ensure(con, row_key):
+    con.execute("INSERT OR IGNORE INTO app_state(row_key, created_at, updated_at) VALUES(?,?,?)",
+                (row_key, _now(), _now()))
+
+
+def _event(con, row_key, ev, payload=""):
+    con.execute("INSERT INTO app_events(row_key, event_type, payload_json, created_at) VALUES(?,?,?,?)",
+                (row_key, ev, payload, _now()))
+
+
+def set_applied(con, row_key):
+    _ensure(con, row_key)
+    con.execute("UPDATE app_state SET applied_at=?, updated_at=? WHERE row_key=?", (_now(), _now(), row_key))
+    set_status(con, row_key, "applied", commit=False)
+    _event(con, row_key, "applied")
+    con.commit()
+
+
+def toggle_star(con, row_key):
+    _ensure(con, row_key)
+    con.execute("UPDATE app_state SET starred = 1 - starred, updated_at=? WHERE row_key=?", (_now(), row_key))
+    con.commit()
+
+
+def set_dismissed(con, row_key, val=1):
+    _ensure(con, row_key)
+    con.execute("UPDATE app_state SET dismissed=?, updated_at=? WHERE row_key=?", (val, _now(), row_key))
+    _event(con, row_key, "dismissed" if val else "restored")
+    con.commit()
+
+
+def save_notes(con, row_key, notes):
+    _ensure(con, row_key)
+    con.execute("UPDATE app_state SET notes=?, updated_at=? WHERE row_key=?", (notes, _now(), row_key))
+    con.commit()
+
+
+def set_status(con, row_key, status, commit=True):
+    con.execute(
+        "INSERT INTO application_status(row_key, status, status_changed_at, source) VALUES(?,?,?, 'manual') "
+        "ON CONFLICT(row_key) DO UPDATE SET status=excluded.status, status_changed_at=excluded.status_changed_at",
+        (row_key, status, _now()))
+    if commit:
+        con.commit()
+
+
+def insights(con, sector=None, day=None) -> dict:
+    rows = [d for d in (_shape(r) for r in con.execute(JOB_SELECT).fetchall()) if not d["dismissed"]]
+    if sector:
+        rows = [d for d in rows if d.get("sector") == sector]
+    if day and day != "all":
+        rows = [d for d in rows if d["job_day"] == day]
+    buckets = [(70, 74), (75, 79), (80, 84), (85, 89), (90, 94), (95, 100)]
+    hist = [{"label": f"{lo}–{hi}", "count": sum(1 for d in rows if lo <= (d["match_score"] or 0) <= hi)}
+            for lo, hi in buckets]
+    from collections import Counter
+    sec = Counter(d.get("sector") or "other" for d in rows)
+    sectors = [{"sector": k, "count": v} for k, v in sec.most_common()]
+    applied = sum(1 for d in rows if d["applied"])
+    funnel = [
+        {"label": "To review", "count": sum(1 for d in rows if not d["applied"])},
+        {"label": "Applied", "count": applied},
+        {"label": "Interviewing", "count": sum(1 for d in rows if d["status"] in ("phone_screen", "interview"))},
+        {"label": "Offer", "count": sum(1 for d in rows if d["status"] == "offer")},
+    ]
+    with_resume = sum(1 for d in rows if d["has_resume"])
+    passes = sum(1 for d in rows if d.get("self_check_passes_target"))
+    scores = [d["match_score"] for d in rows if d["match_score"]]
+    return {"total": len(rows), "score_hist": hist, "sectors": sectors, "funnel": funnel,
+            "ats": {"with_resume": with_resume, "passes": passes, "below": with_resume - passes},
+            "applied": applied, "score_avg": round(sum(scores) / len(scores), 1) if scores else 0}
+
+
+def _person_row(p, ps, drafts, outr) -> dict:
+    """Build a person dict from a people row, person_state row, drafts list, outreach list."""
+    email = p["verified_email"] or ""
+    nm = (p["name"] or "").lower()
+    first = nm.split()[0] if nm else ""
+    dstate = ""
+    for d in drafts:
+        slug = (d.get("person_slug") or "").lower()
+        if first and (first in slug or slug.replace("-", " ") in nm):
+            dstate = d.get("state") or ""
+            break
+    replied = any(o.get("email") == email and email and o.get("replied_at") for o in outr)
+    outreach_status = (ps or {}).get("outreach_status") or "not_contacted"
+    contacted_at = (ps or {}).get("contacted_at") or ""
+    return {
+        "person_key":     p["person_key"],
+        "company_key":    p["company_key"],
+        "name":           p["name"],
+        "role":           p["role"] or "",
+        "email":          email,
+        "has_email":      bool(email),
+        "linkedin_url":   p["linkedin_url"] or "",
+        "draft_state":    dstate,
+        "replied":        replied,
+        "outreach_status": outreach_status,
+        "contacted_at":   contacted_at,
+    }
+
+
+def people(con) -> list[dict]:
+    comp = {r["company_key"]: dict(r) for r in con.execute("SELECT * FROM companies")}
+    drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
+    outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
+    ps_map = {r["person_key"]: dict(r) for r in con.execute("SELECT * FROM person_state")}
+    groups = {}
+    for p in con.execute("SELECT * FROM people"):
+        ck = p["company_key"]
+        g = groups.setdefault(ck, {
+            "company":     (comp.get(ck, {}).get("company_name") or ck),
+            "company_key": ck,
+            "domain":      comp.get(ck, {}).get("domain", ""),
+            "people":      [],
+        })
+        g["people"].append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr))
+    out = sorted(groups.values(), key=lambda g: (-len(g["people"]), g["company"].lower()))
+    for g in out:
+        g["count"] = len(g["people"])
+        g["emails"] = sum(1 for pp in g["people"] if pp["has_email"])
+        g["contacted"] = sum(1 for pp in g["people"] if pp["outreach_status"] in ("contacted", "followup_due", "replied"))
+    return out
+
+
+def company_detail(con, company_key: str) -> dict:
+    comp_row = con.execute("SELECT * FROM companies WHERE company_key=?", (company_key,)).fetchone()
+    company_name = (dict(comp_row)["company_name"] if comp_row else None) or company_key.title()
+    domain = dict(comp_row).get("domain", "") if comp_row else ""
+    drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
+    outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
+    ps_map = {r["person_key"]: dict(r) for r in con.execute("SELECT * FROM person_state")}
+    people_rows = [
+        _person_row(p, ps_map.get(p["person_key"]), drafts, outr)
+        for p in con.execute("SELECT * FROM people WHERE company_key=?", (company_key,))
+    ]
+    return {
+        "company":     company_name,
+        "company_key": company_key,
+        "domain":      domain,
+        "people":      people_rows,
+    }
+
+
+def get_person(con, person_key: str) -> dict | None:
+    p = con.execute("SELECT * FROM people WHERE person_key=?", (person_key,)).fetchone()
+    if not p:
+        return None
+    drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
+    outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
+    ps = con.execute("SELECT * FROM person_state WHERE person_key=?", (person_key,)).fetchone()
+    return _person_row(p, dict(ps) if ps else None, drafts, outr)
+
+
+def set_person_status(con, person_key: str, status: str) -> None:
+    now = _now()
+    con.execute(
+        "INSERT OR IGNORE INTO person_state(person_key, outreach_status, updated_at) VALUES(?,?,?)",
+        (person_key, status, now),
+    )
+    if status == "contacted":
+        con.execute(
+            "UPDATE person_state SET outreach_status=?, updated_at=?, "
+            "contacted_at=COALESCE(contacted_at,?) WHERE person_key=?",
+            (status, now, now, person_key),
+        )
+    else:
+        con.execute(
+            "UPDATE person_state SET outreach_status=?, updated_at=? WHERE person_key=?",
+            (status, now, person_key),
+        )
+    con.commit()
+
+
+def highlight(text, evidence) -> str:
+    """Escape JD text and wrap matched-skill terms in <mark>."""
+    text = text or ""
+    terms = set()
+    for chunk in (evidence or "").split(";"):
+        t = chunk.strip()
+        if len(t) >= 2:
+            terms.add(t)
+        for part in re.split(r"[/&,]", t):
+            part = part.strip()
+            if len(part) >= 2:
+                terms.add(part)
+    esc = _html.escape(text)
+    if not terms:
+        return esc.replace("\n", "<br>")
+    pats = sorted((re.escape(t) for t in terms), key=len, reverse=True)
+    rx = re.compile(r"(?<!\w)(" + "|".join(pats) + r")(?!\w)", re.I)
+    return rx.sub(lambda m: f'<mark class="kw">{m.group(0)}</mark>', esc).replace("\n", "<br>")

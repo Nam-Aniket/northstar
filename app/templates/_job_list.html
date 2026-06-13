@@ -1,0 +1,16 @@
+<div class="flex items-center justify-between mb-3">
+  <p class="text-sm text-ink2"><span class="font-semibold text-ink">{{ jobs|length }}</span> {{ 'role' if jobs|length == 1 else 'roles' }}</p>
+</div>
+{% if jobs %}
+  <div class="flex flex-col gap-3">
+    {% for j in jobs %}{% include "_job_card.html" %}{% endfor %}
+  </div>
+{% else %}
+  <div class="text-center py-20 px-6 bg-paper border border-dashed border-line rounded-2xl">
+    <div class="grid place-items-center w-12 h-12 mx-auto rounded-xl bg-sand text-muted mb-3">
+      <svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    </div>
+    <p class="font-medium">No roles match these filters</p>
+    <p class="text-sm text-muted mt-1">Try lowering the score or clearing filters.</p>
+  </div>
+{% endif %}

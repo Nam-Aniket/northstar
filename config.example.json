@@ -1,0 +1,20 @@
+{
+  "identity": {
+    "name": "Jordan Rivera",
+    "contact": "City, Country | you@example.com | open to remote",
+    "work_rights": "",
+    "needs_sponsorship": false
+  },
+  "matching": {
+    "seniority_cap": null,
+    "generation_enabled": false,
+    "keep_threshold": 45,
+    "strong_threshold": 68,
+    "exclude_companies": []
+  },
+  "search": {
+    "target_keywords": ["analyst", "data analyst"],
+    "target_location": "Remote",
+    "recency_tpr": "r86400"
+  }
+}

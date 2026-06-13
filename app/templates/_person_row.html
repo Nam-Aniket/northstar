@@ -1,0 +1,25 @@
+<div class="prow" id="person-{{ p.person_key|domid }}">
+  <span class="pinitials">{{ p.name.split()[0][:1] if p.name }}{{ p.name.split()[-1][:1] if p.name and p.name.split()|length > 1 }}</span>
+  <div class="min-w-0 flex-1">
+    <div class="text-sm font-medium truncate">{{ p.name }}</div>
+    <div class="text-xs text-ink2 truncate">{{ p.role or 'role unknown' }}{% if p.email %} · {{ p.email }}{% endif %}</div>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    {% set st = p.outreach_status or 'not_contacted' %}
+    <span class="badge {{ 'ok' if st in ('contacted', 'replied') else 'muted' }}">{{ st.replace('_',' ')|title }}</span>
+    <select name="value" class="filter-select" style="width:auto;padding:5px 8px;font-size:12px"
+            hx-post="/person/{{ p.person_key|urlk }}/status"
+            hx-target="#person-{{ p.person_key|domid }}"
+            hx-swap="outerHTML"
+            hx-trigger="change">
+      {% for s in person_status_flow %}
+      <option value="{{ s }}" {{ 'selected' if st == s }}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+    {% if p.linkedin_url %}
+    <a href="{{ p.linkedin_url }}" target="_blank" rel="noopener" class="iconlink" title="LinkedIn profile" aria-label="LinkedIn">
+      <svg viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+    {% endif %}
+  </div>
+</div>

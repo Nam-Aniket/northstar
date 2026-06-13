@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}People · Northstar{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="page-h">People</h1>
+  <p class="page-sub">{{ groups|length }} companies · outreach tracker</p>
+</div>
+
+{% if groups %}
+<div class="grid lg:grid-cols-3 md:grid-cols-2 gap-4">
+  {% for g in groups %}
+  <a href="/company/{{ g.company_key|urlk }}" class="pcard block no-underline hover:shadow-[var(--shadow-hi)] hover:-translate-y-0.5 transition-all duration-200">
+    <div class="phead">
+      <span class="pavatar">{{ g.company[:2]|upper }}</span>
+      <div class="min-w-0">
+        <div class="font-semibold truncate text-ink">{{ g.company }}</div>
+        <div class="text-xs text-muted">{{ g.count }} {{ 'person' if g.count == 1 else 'people' }} · {{ g.emails }} email{{ '' if g.emails == 1 else 's' }} · {{ g.contacted }} contacted</div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel p-10 text-center text-muted">No people tracked yet — seed them via the outreach pipeline (<code>02alt_seed_from_reachout.py</code>).</div>
+{% endif %}
+{% endblock %}

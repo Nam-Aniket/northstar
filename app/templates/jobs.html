@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- clickable stat cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+  {% set cards = [
+    ('To review', stats.to_review, 'clay', 'to_review', '', 'M9 11l3 3 8-8M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'),
+    ('Applied', stats.applied, 'leaf', 'applied', 'all', 'M20 6 9 17l-5-5'),
+    ('Starred', stats.starred, 'gold', 'starred', 'all', 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8-4.3-4.1 5.9-.9z'),
+    ('Total roles', stats.total, 'ink', '', 'all', 'M4 7h16M4 12h16M4 17h10') ] %}
+  {% for label, val, color, vw, dy, path in cards %}
+  <a class="statlink" href="/?{% if vw %}view={{ vw }}&{% endif %}day={{ dy }}">
+    <div class="stat {{ 'ring-2 ring-clay/40' if f.view == vw and vw }}">
+      <div class="lbl">{{ label }}
+        <svg viewBox="0 0 24 24" class="w-4 h-4 text-{{ color }}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ path }}"/></svg>
+      </div>
+      <div class="num text-{{ color }}">{{ val }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- day navigator -->
+<div class="daynav">
+  <a class="daystep {{ 'disabled' if not prev_day }}" href="/?day={{ prev_day }}" title="Older day" aria-label="Older day"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></a>
+  <div class="daypill">
+    <svg viewBox="0 0 24 24" class="w-4 h-4 text-clay" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+    <div><div class="daylabel">{{ current_day if current_day and current_day != 'all' else 'All days' }}</div><div class="daysub">{{ jobs|length }} {{ 'role' if jobs|length == 1 else 'roles' }}{% if view %} · {{ view.replace('_',' ') }}{% endif %}</div></div>
+  </div>
+  <a class="daystep {{ 'disabled' if not next_day }}" href="/?day={{ next_day }}" title="Newer day" aria-label="Newer day"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
+  <a class="daylink {{ 'active' if days and current_day == days[0] }}" href="/?day={{ days[0] if days else '' }}">Latest</a>
+  <a class="daylink {{ 'active' if current_day == 'all' }}" href="/?day=all">All days</a>
+</div>
+
+<div class="grid lg:grid-cols-[260px_1fr] gap-6">
+  <aside class="lg:sticky lg:top-20 self-start">
+    <form hx-get="/" hx-target="#joblist" hx-swap="innerHTML"
+          hx-trigger="change, keyup changed delay:300ms from:input[name='q']"
+          class="panel p-4 flex flex-col gap-5">
+      <input type="hidden" name="day" value="{{ f.day }}">
+      <input type="hidden" name="view" value="{{ f.view }}">
+      <div>
+        <label for="q" class="filter-label">Search</label>
+        <div class="relative">
+          <svg viewBox="0 0 24 24" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="q" name="q" value="{{ f.q }}" placeholder="company, role…" autocomplete="off" class="filter-select pl-9">
+        </div>
+      </div>
+      <div>
+        <label for="min_score" class="filter-label flex justify-between">Minimum score <span class="text-clay font-semibold" id="scoreval">{{ f.min_score }}</span></label>
+        <input id="min_score" name="min_score" type="range" min="0" max="100" step="5" value="{{ f.min_score }}" oninput="document.getElementById('scoreval').textContent=this.value" class="w-full accent-clay cursor-pointer">
+      </div>
+      <div>
+        <label for="sector" class="filter-label">Sector</label>
+        <select id="sector" name="sector" class="filter-select">
+          <option value="">All sectors</option>
+          {% for s in sectors %}<option value="{{ s.sector }}" {{ 'selected' if f.sector==s.sector }}>{{ s.sector.replace('_',' ')|title }} ({{ s.c }})</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="status" class="filter-label">Stage</label>
+        <select id="status" name="status" class="filter-select">
+          <option value="">Any stage</option>
+          {% for st in ['new','applied','phone_screen','interview','offer','rejected'] %}<option value="{{ st }}" {{ 'selected' if f.status==st }}>{{ st.replace('_',' ')|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="flex flex-col gap-2.5 pt-1 border-t border-line">
+        <label class="toggle-row"><input type="checkbox" name="starred" value="1" {{ 'checked' if f.starred }} class="accent-clay w-4 h-4 cursor-pointer"><span>Starred only</span></label>
+        <label class="toggle-row"><input type="checkbox" name="show_dismissed" value="1" {{ 'checked' if f.show_dismissed }} class="accent-clay w-4 h-4 cursor-pointer"><span>Show dismissed</span></label>
+      </div>
+      <a href="/?day={{ f.day }}" class="text-xs text-muted hover:text-clay transition-colors text-center">Reset filters</a>
+    </form>
+  </aside>
+
+  <section><div id="joblist">{% include "_job_list.html" %}</div></section>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ c.company }} · People · Northstar{% endblock %}
+{% block content %}
+<a href="/people" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-clay transition-colors mb-4">
+  <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>People
+</a>
+
+<div class="mb-6">
+  <h1 class="page-h">{{ c.company }}</h1>
+  <p class="page-sub">{{ c.people|length }} contact{{ '' if c.people|length == 1 else 's' }}{% if c.domain %} · {{ c.domain }}{% endif %}</p>
+</div>
+
+{% if c.people %}
+<div class="panel">
+  {% for p in c.people %}
+    {% include "_person_row.html" %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel p-10 text-center text-muted">No contacts tracked for this company yet.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,230 @@
+{
+  "supported_skills": {
+    "SQL": {
+      "aliases": ["sql"],
+      "group": "Analytics & BI"
+    },
+    "Python": {
+      "aliases": ["python"],
+      "group": "Analytics & BI"
+    },
+    "R": {
+      "aliases": ["r programming", "r language", "rlang"],
+      "group": "Data Science"
+    },
+    "Power BI": {
+      "aliases": ["power bi", "powerbi"],
+      "group": "Analytics & BI"
+    },
+    "Tableau": {
+      "aliases": ["tableau"],
+      "group": "Analytics & BI"
+    },
+    "Excel": {
+      "aliases": ["excel", "microsoft excel"],
+      "group": "Analytics & BI"
+    },
+    "DAX": {
+      "aliases": ["dax"],
+      "group": "Analytics & BI"
+    },
+    "Power Query": {
+      "aliases": ["power query"],
+      "group": "Analytics & BI"
+    },
+    "Data Modelling": {
+      "aliases": ["data modelling", "data modeling", "dimensional model", "dimensional models", "dimensional modeling", "dimensional modelling"],
+      "group": "Data Engineering"
+    },
+    "Data Visualisation": {
+      "aliases": ["data visualisation", "data visualization", "visualisation", "visualization"],
+      "group": "Analytics & BI"
+    },
+    "Statistical Analysis": {
+      "aliases": ["statistical analysis", "statistical modelling", "statistical modeling", "statistics"],
+      "group": "Data Science"
+    },
+    "Self-Service BI": {
+      "aliases": ["self-service bi", "self-service analytics", "self-service reporting", "self service bi", "self service analytics", "self service reporting", "self-service"],
+      "group": "Analytics & BI"
+    },
+    "Data Storytelling": {
+      "aliases": ["data storytelling", "storytelling"],
+      "group": "Analytics & BI"
+    },
+    "KPI Reporting": {
+      "aliases": ["kpi reporting", "kpi dashboards", "kpi"],
+      "group": "Analytics & BI"
+    },
+    "Dashboarding": {
+      "aliases": ["dashboarding", "dashboard", "dashboards"],
+      "group": "Analytics & BI"
+    },
+    "Insights": {
+      "aliases": ["insights", "data insights"],
+      "group": "Analytics & BI"
+    },
+    "Stakeholder Management": {
+      "aliases": ["stakeholder management", "business partnering", "stakeholder engagement", "stakeholder"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Requirements Gathering": {
+      "aliases": ["requirements gathering", "requirements elicitation", "requirements workshops"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Process Mapping": {
+      "aliases": ["process mapping", "process maps", "process documentation", "process analysis"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "UAT": {
+      "aliases": ["uat", "user acceptance testing", "acceptance testing"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "User Stories": {
+      "aliases": ["user stories", "user story"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Documentation": {
+      "aliases": ["documentation", "technical documentation"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Communication": {
+      "aliases": ["communication", "written communication", "verbal communication"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Collaboration": {
+      "aliases": ["collaboration", "collaborative"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Mentoring": {
+      "aliases": ["mentoring", "mentorship", "coaching"],
+      "group": "Business Delivery",
+      "soft": true
+    },
+    "Agile/Scrum": {
+      "aliases": ["agile", "scrum", "agile/scrum", "agile scrum"],
+      "group": "Business Delivery"
+    },
+    "Jira": {
+      "aliases": ["jira"],
+      "group": "Business Delivery"
+    },
+    "ETL": {
+      "aliases": ["etl", "extract transform load", "extract, transform, load"],
+      "group": "Data Engineering"
+    },
+    "Data Pipelines": {
+      "aliases": ["data pipeline", "data pipelines", "data ingestion"],
+      "group": "Data Engineering"
+    },
+    "Data Quality": {
+      "aliases": ["data quality", "data quality checks", "data validation"],
+      "group": "Data Engineering"
+    },
+    "Data Cleaning": {
+      "aliases": ["data cleaning", "data cleansing", "data wrangling"],
+      "group": "Data Engineering"
+    },
+    "Data Warehousing": {
+      "aliases": ["data warehouse", "data warehousing", "dwh"],
+      "group": "Data Engineering"
+    },
+    "Data Governance": {
+      "aliases": ["data governance", "data stewardship"],
+      "group": "Data Engineering"
+    },
+    "Data Migration": {
+      "aliases": ["data migration", "data migration and reconciliation"],
+      "group": "Data Engineering"
+    },
+    "Reconciliation": {
+      "aliases": ["reconciliation", "data reconciliation", "reconcile"],
+      "group": "Data Engineering"
+    },
+    "Automation": {
+      "aliases": ["automation", "automated", "automate"],
+      "group": "Data Engineering"
+    },
+    "Azure Data Factory": {
+      "aliases": ["azure data factory", "adf"],
+      "group": "Data Engineering"
+    },
+    "Azure Databricks": {
+      "aliases": ["azure databricks", "databricks"],
+      "group": "Data Engineering"
+    },
+    "Apache Spark": {
+      "aliases": ["apache spark", "spark"],
+      "group": "Data Engineering"
+    },
+    "Kafka": {
+      "aliases": ["kafka", "apache kafka"],
+      "group": "Data Engineering"
+    },
+    "Machine Learning": {
+      "aliases": ["machine learning", "ml"],
+      "group": "Data Science"
+    },
+    "Deep Learning": {
+      "aliases": ["deep learning", "neural network", "neural networks"],
+      "group": "Data Science"
+    },
+    "NLP": {
+      "aliases": ["nlp", "natural language processing", "text analytics"],
+      "group": "Data Science"
+    },
+    "Forecasting": {
+      "aliases": ["forecasting", "demand forecasting", "load forecasting", "predictive forecasting"],
+      "group": "Data Science"
+    },
+    "Predictive Analytics": {
+      "aliases": ["predictive analytics", "predictive modelling", "predictive modeling"],
+      "group": "Data Science"
+    },
+    "A/B Testing": {
+      "aliases": ["a/b testing", "ab testing", "experiment design", "hypothesis testing"],
+      "group": "Data Science"
+    },
+    "Feature Engineering": {
+      "aliases": ["feature engineering", "feature selection"],
+      "group": "Data Science"
+    },
+    "Model Deployment": {
+      "aliases": ["model deployment", "model serving", "mlops"],
+      "group": "Data Science"
+    },
+    "Scikit-learn": {
+      "aliases": ["scikit-learn", "sklearn"],
+      "group": "Data Science"
+    },
+    "Pandas": {
+      "aliases": ["pandas"],
+      "group": "Data Science"
+    },
+    "NumPy": {
+      "aliases": ["numpy"],
+      "group": "Data Science"
+    },
+    "Attention to Detail": {
+      "aliases": ["attention to detail", "detail-oriented"],
+      "group": "Business Delivery",
+      "soft": true
+    }
+  },
+  "unsupported_skills": {
+    "Snowflake": ["snowflake"],
+    "dbt": ["dbt"],
+    "Looker": ["looker"],
+    "SAS": ["sas"],
+    "SPSS": ["spss"],
+    "Alteryx": ["alteryx"]
+  }
+}

@@ -1,0 +1,34 @@
+# --- secrets & per-user config (never commit) ---
+.env
+skills.json
+config.json
+profile.yaml
+gmail_oauth_client.json
+gmail_oauth_token.json
+
+# --- runtime data & outputs (PII / scraped content) ---
+data/
+drafts/
+resumes/
+.crawler_cache/
+company_domains.json
+outreach.db
+*.db
+*.csv
+*.docx
+app/control_panel.db
+job_alerts_raw.csv
+job_posts*.csv
+matched_jobs*.csv
+
+# --- python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# --- editor / agent ---
+.claude/
+.idea/
+.vscode/

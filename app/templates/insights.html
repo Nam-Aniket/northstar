@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Insights · Northstar{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="page-h">Insights</h1>
+    <p class="page-sub">{{ d.total }} active roles · average fit {{ d.score_avg }}</p>
+  </div>
+  <form method="get" class="flex items-center gap-2">
+    <select name="sector" class="filter-select" style="width:auto" onchange="this.form.submit()">
+      <option value="">All sectors</option>
+      {% for s in sectors %}<option value="{{ s.sector }}" {{ 'selected' if f.sector==s.sector }}>{{ s.sector.replace('_',' ')|title }}</option>{% endfor %}
+    </select>
+    <select name="day" class="filter-select" style="width:auto" onchange="this.form.submit()">
+      <option value="">All days</option>
+      {% for dd in days %}<option value="{{ dd }}" {{ 'selected' if f.day==dd }}>{{ dd }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+  <div class="kpi"><div class="l">Active roles</div><div class="v">{{ d.total }}</div></div>
+  <div class="kpi"><div class="l">Average fit</div><div class="v text-clay">{{ d.score_avg }}</div></div>
+  <div class="kpi"><div class="l">Applied</div><div class="v text-leaf">{{ d.applied }}</div></div>
+  <div class="kpi"><div class="l">Resumes ready</div><div class="v">{{ d.ats.passes }}<span style="font-size:15px;color:rgb(var(--c-muted))">/{{ d.ats.with_resume }}</span></div></div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-5">
+  <div class="chart-card">
+    <h2 class="section-h">Match-score distribution</h2>
+    {% set maxc = (d.score_hist | map(attribute='count') | max) or 1 %}
+    <div class="hist">
+      {% for b in d.score_hist %}
+      <div class="col"><div class="hv">{{ b.count }}</div>
+        <div class="hbar" style="height:{{ (b.count / maxc * 100) | round | int }}%"></div>
+        <div class="hx">{{ b.label }}</div></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h2 class="section-h">Roles by sector</h2>
+    {% set maxs = (d.sectors | map(attribute='count') | max) or 1 %}
+    {% for s in d.sectors %}
+    <div class="bar-row">
+      <span class="blabel">{{ s.sector.replace('_',' ') }}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:{{ (s.count / maxs * 100) | round | int }}%"></div></div>
+      <span class="bar-val">{{ s.count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-5 mt-5">
+  <div class="chart-card">
+    <h2 class="section-h">Application funnel</h2>
+    <div class="funnel">
+      {% for st in d.funnel %}<div class="fstage"><div class="fv">{{ st.count }}</div><div class="fl">{{ st.label }}</div></div>{% endfor %}
+    </div>
+    <p class="text-xs text-muted mt-3">Fills in as you apply and log outcomes.</p>
+  </div>
+
+  <div class="chart-card">
+    <h2 class="section-h">Resume readiness</h2>
+    {% set rtot = d.total or 1 %}
+    <div class="bar-row"><span class="blabel">Passes ATS</span><div class="bar-track"><div class="bar-fill" style="width:{{ (d.ats.passes / rtot * 100) | round | int }}%;background:rgb(var(--c-good))"></div></div><span class="bar-val">{{ d.ats.passes }}</span></div>
+    <div class="bar-row"><span class="blabel">Below target</span><div class="bar-track"><div class="bar-fill" style="width:{{ (d.ats.below / rtot * 100) | round | int }}%;background:rgb(var(--c-warn))"></div></div><span class="bar-val">{{ d.ats.below }}</span></div>
+    <div class="bar-row"><span class="blabel">No resume yet</span><div class="bar-track"><div class="bar-fill" style="width:{{ ((d.total - d.ats.with_resume) / rtot * 100) | round | int }}%;background:rgb(var(--c-muted))"></div></div><span class="bar-val">{{ d.total - d.ats.with_resume }}</span></div>
+  </div>
+</div>
+{% endblock %}
