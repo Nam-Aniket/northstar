@@ -9,7 +9,7 @@ import urllib.parse
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -164,11 +164,14 @@ def people(request: Request):
 
 @app.get("/jobs/{row_key:path}", response_class=HTMLResponse)
 def detail(request: Request, row_key: str):
-    con = conn(); job = queries.get_job(con, row_key); con.close()
+    con = conn(); job = queries.get_job(con, row_key)
     if not job:
+        con.close()
         return HTMLResponse("Job not found", status_code=404)
+    company = queries.company_detail(con, queries.normalize_company(job["company"]))
+    con.close()
     return templates.TemplateResponse(request, "job_detail.html",
-                                       {"j": job, "status_flow": queries.STATUS_FLOW})
+                                       {"j": job, "status_flow": queries.STATUS_FLOW, "company": company})
 
 
 @app.get("/company/{company_key:path}", response_class=HTMLResponse)
@@ -191,4 +194,6 @@ def person_status(request: Request, person_key: str, value: str = Form(...)):
 @app.post("/sync")
 def sync():
     subprocess.run([sys.executable, str(APP_DIR / "sync.py")], cwd=str(ROOT))
-    return RedirectResponse("/", status_code=303)
+    # HX-Redirect makes HTMX do a full client-side navigation instead of swapping
+    # the whole page into the Sync button (which produced a duplicate header).
+    return Response(status_code=204, headers={"HX-Redirect": "/"})
