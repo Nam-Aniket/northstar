@@ -89,10 +89,21 @@ DISPLAY_OVERRIDES = {
     "visualization": "Data Visualization",
 }
 
+# Anchored requirements-region detector (FIX A1).
+# Trigger must be at the START of a line (optionally preceded by whitespace/bullets/numbers)
+# OR immediately followed by a colon — i.e. a real section header, not a buried prose word.
+# If no anchored match is found, extract_terms_detailed falls back to req_start=len(text)
+# (no region weighting), which is the safe default.
 _REQ_REGION = re.compile(
-    r"(requirements|what you(‘|’)ll bring|about you|qualifications|must have|"
-    r"essential|skills and experience|what we(‘|’)re looking for|to be successful)",
-    re.IGNORECASE,
+    r"(?:(?:^|(?<=\n))[\s\-\*\d\.\)]*"
+    r"(requirements|what you(?:’|’)ll bring|about you|qualifications|must have|"
+    r"essential|skills and experience|what we(?:’|’)re looking for|to be successful)"
+    r"[\s\-\*\d\.\)]*(?:\n|:|\s*$)"
+    r"|"
+    r"(requirements|what you(?:’|’)ll bring|about you|qualifications|must have|"
+    r"essential|skills and experience|what we(?:’|’)re looking for|to be successful)"
+    r"\s*:)",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 

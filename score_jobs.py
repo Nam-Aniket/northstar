@@ -57,9 +57,17 @@ STRONG_THRESHOLD = 68
 # matches near the top.
 SMOOTH = 2
 
+# FIX B1: removed bare "citizenship" — it matched EEO boilerplate.
+# Keep specific requirement phrasings only.
 _CITIZENSHIP_REQUIRED = re.compile(
-    r"\b(australian citizen|citizenship|security clearance|agsva|baseline clearance|"
+    r"\b(australian citizen|security clearance|agsva|baseline clearance|"
     r"nv1|nv2|must be a citizen|permanent resident only|pr or citizen)\b",
+    re.IGNORECASE,
+)
+# EEO context markers: if a citizenship-ish match sits within ~60 chars of these,
+# the cap is suppressed (it's just a diversity/EEO statement, not a requirement).
+_EEO_CONTEXT = re.compile(
+    r"\b(gender identity|sexual orientation|veteran|protected characteristic|marital status)\b",
     re.IGNORECASE,
 )
 # Senior/over-qualified signals — only counted inside the requirements region.
@@ -68,6 +76,40 @@ _SENIORITY_SENIOR = re.compile(
     r"minimum (of )?[5-9] years|at least [5-9] years)\b",
     re.IGNORECASE,
 )
+# FIX A2: off-target role soft cap helpers.
+# Stopwords stripped before token-overlap check (seniority/level words + common English).
+_TITLE_STOPWORDS = frozenset({
+    "senior", "junior", "lead", "principal", "head", "associate", "staff",
+    "the", "and", "of", "in", "a", "an", "to", "for", "with", "at",
+    "i", "ii", "iii", "iv", "v",
+})
+
+
+def _title_tokens(text: str) -> frozenset:
+    """Lowercase significant tokens from a job title or keyword phrase."""
+    return frozenset(
+        t for t in re.split(r"[^a-z]+", text.lower()) if t and t not in _TITLE_STOPWORDS
+    )
+
+
+def _is_off_target(role: str) -> bool:
+    """Return True only if the job title shares NO significant token with any tracked keyword.
+
+    Conservative: if config has no keywords, or if there is ANY token overlap,
+    do NOT cap.
+    """
+    keywords = _config.get_target_keywords()
+    if not keywords:
+        return False
+    role_toks = _title_tokens(role)
+    if not role_toks:
+        return False
+    for kw in keywords:
+        if role_toks & _title_tokens(kw):
+            return False  # overlap found — not off-target
+    return True
+
+
 _ACRONYM = re.compile(r"\b([A-Z]{2,5})\b")
 # Common non-tool acronyms that must never count as a missing tech requirement.
 _ACRONYM_STOP = frozenset({
@@ -134,12 +176,24 @@ def score_job(role: str, jd: str) -> dict:
         confidence = "ok" if (req_start is not None and total_w >= 4) else "low"
 
     caps = []
-    if _config.needs_sponsorship and _CITIZENSHIP_REQUIRED.search(jd):
-        fit = min(fit, 25.0)
-        caps.append("citizenship/clearance required")
+    if _config.needs_sponsorship:
+        cit_match = _CITIZENSHIP_REQUIRED.search(jd)
+        if cit_match:
+            # Suppress if the match is within ~60 chars of EEO boilerplate.
+            window_start = max(0, cit_match.start() - 60)
+            window_end = min(len(jd), cit_match.end() + 60)
+            window = jd[window_start:window_end]
+            if not _EEO_CONTEXT.search(window):
+                fit = min(fit, 25.0)
+                caps.append("citizenship/clearance required")
     if _config.seniority_cap is not None and req_start is not None and _SENIORITY_SENIOR.search(jd[req_start:]):
         fit *= 0.85
         caps.append("senior/lead level")
+    # FIX A2: off-target role soft cap (0.7×) when the job title shares no significant
+    # token with ANY of the user's tracked role keywords.  Skip if no keywords configured.
+    if _is_off_target(role):
+        fit *= 0.7
+        caps.append("off-target role")
 
     fit = round(max(0.0, min(100.0, fit)))
     return {
