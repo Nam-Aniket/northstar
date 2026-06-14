@@ -1,9 +1,7 @@
-<div id="run-progress" {% if st.stage not in ['done','error','idle'] %}hx-get="/run/status" hx-target="#run-progress" hx-swap="outerHTML" hx-trigger="every 1s"{% endif %} class="run-progress run-{{ st.stage }}">
+<div id="run-progress" {% if st.stage not in ['done','error','idle'] %}hx-get="/run/status?watch=1" hx-target="#run-progress" hx-swap="outerHTML" hx-trigger="every 1s"{% endif %} class="run-progress run-{{ st.stage }}">
   {% if st.stage in ['prepare','score','generate','sync'] %}
     <div class="run-bar"><div class="run-fill" style="width:{{ st.pct }}%"></div></div>
     <div class="run-msg"><span class="spinner"></span> {{ st.message }} · {{ st.pct }}%</div>
-  {% elif st.stage == 'done' %}
-    <div class="run-msg run-ok" hx-get="/" hx-target="body" hx-swap="outerHTML" hx-trigger="load delay:800ms">Up to date — refreshing…</div>
   {% elif st.stage == 'error' %}
     <div class="run-msg run-err">Failed at <b>{{ st.error_stage }}</b>. Dashboard unchanged. <details><summary>details</summary><pre>{{ st.error_detail }}</pre></details></div>
   {% endif %}

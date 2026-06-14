@@ -21,6 +21,11 @@ ROOT = Path(__file__).resolve().parent.parent
 RESUME_DIR = ROOT / "resumes"
 APP_DIR = Path(__file__).resolve().parent
 
+# Resting state for run_status.json. Used to "consume" a finished/failed run so
+# it can't replay a page refresh on the next load.
+_IDLE = {"stage": "idle", "pct": 0, "message": "", "started_at": None,
+         "finished_at": None, "ok": None, "error_stage": None, "error_detail": None}
+
 app = FastAPI(title="Job-Hunt Console")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
@@ -367,11 +372,41 @@ def run_start(request: Request):
 
 @app.get("/run/status", response_class=HTMLResponse)
 def run_status_view(request: Request):
+    """Progress widget endpoint.
+
+    Two callers, distinguished by ?watch=1:
+      * cold page load (base.html, no marker) — only starts watching if a run is
+        actually live; a stale "done" left by a background run is cleared
+        silently with NO reload.
+      * active poll (the progress fragment, watch=1) — when the run it is
+        watching finishes, the page hard-reloads exactly once via HX-Refresh.
+    """
     import run_status
+    watch = request.query_params.get("watch") == "1"
     st = run_status.read()
-    # A finished run refreshes the board once; then reset to idle so the progress
-    # widget stops re-triggering that refresh on every page load (else it loops).
-    if st.get("stage") == "done":
-        run_status.write(stage="idle", pct=0, message="", started_at=None,
-                         finished_at=None, ok=None, error_stage=None, error_detail=None)
+    stage = st.get("stage")
+
+    # Run in progress -> live fragment (the template keeps polling with ?watch=1).
+    if stage in ("prepare", "score", "generate", "sync"):
+        return templates.TemplateResponse(request, "_run_progress.html", {"st": st})
+
+    # Failed run -> show the error; fragment carries no poll trigger so polling stops.
+    if stage == "error":
+        return templates.TemplateResponse(request, "_run_progress.html", {"st": st})
+
+    # Finished run -> consume it so it can never replay on a later load.
+    if stage == "done":
+        run_status.write(**_IDLE)
+        if watch:
+            # Only the tab that watched the run reloads, once, with a fresh document.
+            return Response(status_code=200, headers={"HX-Refresh": "true"})
+        return templates.TemplateResponse(request, "_run_progress.html", {"st": _IDLE})
+
+    # Idle: a cold load that caught a run mid-flight (lock held but no stage yet)
+    # becomes a watcher; otherwise just render the quiet idle widget.
+    if not watch and run_status.is_running():
+        return templates.TemplateResponse(
+            request, "_run_progress.html",
+            {"st": {**_IDLE, "stage": "prepare", "message": "Running…"}},
+        )
     return templates.TemplateResponse(request, "_run_progress.html", {"st": st})
