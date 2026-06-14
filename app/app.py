@@ -1,11 +1,13 @@
 """Job-Hunt Console — local FastAPI app over the pipeline outputs."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
 import sys
 import urllib.parse
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
@@ -183,6 +185,26 @@ def tracker_status(request: Request, row_key: str, value: str = Form(...)):
     r = queries.get_tracker_row(con, row_key)
     con.close()
     return templates.TemplateResponse(request, "_tracker_row.html", {"r": r})
+
+
+@app.get("/builder", response_class=HTMLResponse)
+def builder(request: Request):
+    return templates.TemplateResponse(request, "builder.html", {})
+
+
+@app.post("/builder/download")
+def builder_download(payload: str = Form(...)):
+    data = json.loads(payload)
+    from resume_docx import build_resume_docx  # imported here to keep startup fast
+    doc = build_resume_docx(data)
+    buf = BytesIO()
+    doc.save(buf)
+    fname = (data.get("name") or "resume").strip().replace(" ", "_") + "_resume.docx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @app.get("/tracker/export")
