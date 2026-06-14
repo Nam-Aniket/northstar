@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% if onb_state != 'READY' %}{% include '_onboarding.html' %}{% endif %}
 <!-- clickable stat cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
   {% set cards = [

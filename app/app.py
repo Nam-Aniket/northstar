@@ -11,7 +11,7 @@ import urllib.parse
 from io import BytesIO
 from pathlib import Path
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,6 +21,7 @@ from app import db, queries
 ROOT = Path(__file__).resolve().parent.parent
 RESUME_DIR = ROOT / "resumes"
 APP_DIR = Path(__file__).resolve().parent
+UPLOADS_DIR = ROOT / "uploads"
 
 # Resting state for run_status.json. Used to "consume" a finished/failed run so
 # it can't replay a page refresh on the next load.
@@ -80,6 +81,9 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         prev_day = ""
         next_day = ""
 
+    onb_state = queries.onboarding_state(con)
+    onb = queries.get_onboarding(con)
+    positions = queries.list_positions(con)
     ctx = {
         "request": request, "jobs": jobs, "stats": queries.stats(con),
         "sectors": queries.sectors(con),
@@ -91,11 +95,146 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         "current_day": current_day,
         "prev_day": prev_day,
         "next_day": next_day,
+        "onb_state": onb_state,
+        "onb": onb,
+        "positions": positions,
     }
     con.close()
     # HTMX partial refresh of just the list when filtering
     tpl = "_job_list.html" if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "joblist" else "jobs.html"
     return templates.TemplateResponse(request, tpl, ctx)
+
+
+@app.get("/onboarding", response_class=HTMLResponse)
+def onboarding_page(request: Request):
+    con = conn()
+    state = queries.onboarding_state(con)
+    onb = queries.get_onboarding(con)
+    positions = queries.list_positions(con)
+    con.close()
+    return templates.TemplateResponse(request, "_onboarding.html",
+                                      {"state": state, "onb": onb, "positions": positions})
+
+
+@app.post("/onboarding/resume", response_class=HTMLResponse)
+async def onboarding_resume_upload(request: Request, file: UploadFile = File(...)):
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    if ext not in (".docx", ".pdf"):
+        return HTMLResponse(
+            '<div id="resume-zone" class="ob-error">Only .docx or .pdf files are accepted.</div>',
+            status_code=422,
+        )
+    UPLOADS_DIR.mkdir(exist_ok=True)
+    # Remove any existing base_resume.* with a different extension
+    for old in UPLOADS_DIR.glob("base_resume.*"):
+        old.unlink(missing_ok=True)
+    dest = UPLOADS_DIR / f"base_resume{ext}"
+    dest.write_bytes(await file.read())
+
+    # Build skills in-process
+    import config as _config
+    from build_profile import _load_taxonomy, build_skills_json, extract_text, match_resume
+    if ext == ".pdf":
+        try:
+            import pypdf  # noqa: F401
+        except ImportError:
+            dest.unlink(missing_ok=True)
+            return HTMLResponse(
+                '<div id="resume-zone" class="ob-error">pypdf is not installed. '
+                'Run <code>pip install pypdf</code> or upload a .docx file.</div>',
+                status_code=200,
+            )
+    taxonomy_path = _config.ROOT / "taxonomy.json"
+    resume_text = extract_text(dest)
+    taxonomy = _load_taxonomy(taxonomy_path)
+    present = match_resume(resume_text, taxonomy)
+    skills = build_skills_json(present, taxonomy)
+    import json as _json
+    skills_path = _config._SKILLS_PATH
+    # Write to real skills.json (not the example)
+    real_skills = _config.ROOT / "skills.json"
+    tmp_path = str(real_skills) + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        _json.dump(skills, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, str(real_skills))
+
+    n_skills = len(skills.get("supported_skills", {}))
+    import collections
+    by_group: collections.Counter = collections.Counter(
+        v["group"] for v in skills.get("supported_skills", {}).values()
+    )
+    n_groups = len(by_group)
+    summary = f"Found {n_skills} skills across {n_groups} groups"
+
+    con = conn()
+    queries.set_resume(con, dest.name, summary)
+    onb = queries.get_onboarding(con)
+    positions = queries.list_positions(con)
+    con.close()
+    return templates.TemplateResponse(request, "_resume_zone.html",
+                                      {"onb": onb, "positions": positions})
+
+
+@app.post("/onboarding/resume/delete", response_class=HTMLResponse)
+def onboarding_resume_delete(request: Request):
+    for f in UPLOADS_DIR.glob("base_resume.*"):
+        f.unlink(missing_ok=True)
+    import config as _config
+    real_skills = _config.ROOT / "skills.json"
+    real_skills.unlink(missing_ok=True)
+    con = conn()
+    queries.clear_resume(con)
+    onb = queries.get_onboarding(con)
+    positions = queries.list_positions(con)
+    con.close()
+    return templates.TemplateResponse(request, "_resume_zone.html",
+                                      {"onb": onb, "positions": positions})
+
+
+@app.post("/onboarding/positions", response_class=HTMLResponse)
+def onboarding_add_positions(request: Request, titles: str = Form("")):
+    con = conn()
+    state = queries.onboarding_state(con)
+    if state == "NEEDS_RESUME":
+        con.close()
+        return Response(
+            status_code=409,
+            headers={"HX-Trigger": json.dumps({"toast": "Add a resume first"})},
+        )
+    queries.add_positions(con, titles)
+    positions = queries.list_positions(con)
+    onb = queries.get_onboarding(con)
+    con.close()
+    return templates.TemplateResponse(request, "_positions.html",
+                                      {"positions": positions, "onb": onb})
+
+
+@app.post("/onboarding/positions/delete", response_class=HTMLResponse)
+def onboarding_delete_position(request: Request, title: str = Form(...)):
+    con = conn()
+    queries.remove_position(con, title)
+    positions = queries.list_positions(con)
+    onb = queries.get_onboarding(con)
+    con.close()
+    return templates.TemplateResponse(request, "_positions.html",
+                                      {"positions": positions, "onb": onb})
+
+
+@app.post("/onboarding/location")
+def onboarding_location(location: str = Form("")):
+    con = conn()
+    queries.set_location(con, location.strip())
+    con.close()
+    return Response(status_code=204)
+
+
+@app.post("/onboarding/recency")
+def onboarding_recency(recency_tpr: str = Form("r86400")):
+    con = conn()
+    queries.set_recency(con, recency_tpr)
+    con.close()
+    return Response(status_code=204)
 
 
 @app.get("/jobs/{row_key:path}/resume")
@@ -364,6 +503,14 @@ def sync():
 @app.post("/run")
 def run_start(request: Request):
     import run_status
+    con = conn()
+    ob_state = queries.onboarding_state(con)
+    con.close()
+    if ob_state != "READY":
+        return Response(
+            status_code=409,
+            headers={"HX-Trigger": json.dumps({"toast": "Add a resume and at least one role first"})},
+        )
     if run_status.is_running():
         return Response(
             status_code=409,

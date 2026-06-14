@@ -1,3 +1,6 @@
+# --- uploaded resumes (PII, regeneratable) ---
+uploads/
+
 # --- secrets & per-user config (never commit) ---
 .env
 skills.json

@@ -1,0 +1,31 @@
+<div id="resume-zone" class="ob-resume-uploaded">
+  <div class="flex items-start gap-3">
+    <svg viewBox="0 0 24 24" class="w-8 h-8 text-leaf shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+      <path d="M14 2v6h6"/><path d="M9 13l2 2 4-4"/>
+    </svg>
+    <div class="min-w-0 flex-1">
+      <div class="font-semibold text-sm truncate">{{ onb.resume_filename }}</div>
+      <div class="text-xs text-muted mt-0.5">{{ onb.resume_summary }}</div>
+    </div>
+  </div>
+  <div class="flex gap-2 mt-4">
+    <button hx-post="/onboarding/resume/delete"
+            hx-target="#resume-zone"
+            hx-swap="outerHTML"
+            class="btn-undo text-xs">
+      Remove
+    </button>
+    <label class="btn text-xs cursor-pointer">
+      Re-upload
+      <form hx-post="/onboarding/resume"
+            hx-encoding="multipart/form-data"
+            hx-target="#resume-zone"
+            hx-swap="outerHTML"
+            style="display:contents">
+        <input type="file" name="file" accept=".docx,.pdf" required class="sr-only"
+               onchange="this.closest('form').submit()">
+      </form>
+    </label>
+  </div>
+</div>

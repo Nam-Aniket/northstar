@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import datetime
 import html as _html
+import json
+import os
 import re
 
 from app import db
@@ -486,6 +488,129 @@ def delete_manual_person(con, person_key: str) -> None:
     con.execute("DELETE FROM manual_people WHERE person_key=?", (person_key,))
     con.execute("DELETE FROM person_state WHERE person_key=?", (person_key,))
     con.commit()
+
+
+# ---------------------------------------------------------------------------
+# Onboarding helpers (Zone-2 tables: onboarding + tracked_positions)
+# ---------------------------------------------------------------------------
+
+def get_onboarding(con) -> dict:
+    """Return the singleton onboarding row, creating it (id=1) if absent."""
+    con.execute(
+        "INSERT OR IGNORE INTO onboarding(id, created_at, updated_at) VALUES(1,?,?)",
+        (_now(), _now()),
+    )
+    con.commit()
+    r = con.execute("SELECT * FROM onboarding WHERE id=1").fetchone()
+    return dict(r)
+
+
+def onboarding_state(con) -> str:
+    """Return 'NEEDS_RESUME', 'NEEDS_POSITIONS', or 'READY'."""
+    onb = get_onboarding(con)
+    if not onb.get("skills_built"):
+        return "NEEDS_RESUME"
+    count = con.execute("SELECT COUNT(*) FROM tracked_positions").fetchone()[0]
+    if count == 0:
+        return "NEEDS_POSITIONS"
+    return "READY"
+
+
+def set_resume(con, filename: str, summary: str) -> None:
+    now = _now()
+    con.execute(
+        "UPDATE onboarding SET resume_filename=?, resume_uploaded_at=?, resume_summary=?, "
+        "skills_built=1, updated_at=? WHERE id=1",
+        (filename, now, summary, now),
+    )
+    con.commit()
+
+
+def clear_resume(con) -> None:
+    now = _now()
+    con.execute(
+        "UPDATE onboarding SET skills_built=0, resume_filename=NULL, resume_summary=NULL, updated_at=? WHERE id=1",
+        (now,),
+    )
+    con.commit()
+
+
+def add_positions(con, raw: str) -> None:
+    """Split raw on commas, strip, dedupe, insert each. Then write config."""
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    seen: set[str] = set()
+    now = _now()
+    for display in parts:
+        title = display.lower()
+        if title in seen:
+            continue
+        seen.add(title)
+        con.execute(
+            "INSERT OR IGNORE INTO tracked_positions(title, display, created_at) VALUES(?,?,?)",
+            (title, display, now),
+        )
+    con.commit()
+    write_config(con)
+
+
+def remove_position(con, title: str) -> None:
+    con.execute("DELETE FROM tracked_positions WHERE title=?", (title,))
+    con.commit()
+    write_config(con)
+
+
+def set_location(con, loc: str) -> None:
+    con.execute("UPDATE onboarding SET location=?, updated_at=? WHERE id=1", (loc, _now()))
+    con.commit()
+    write_config(con)
+
+
+def set_recency(con, tpr: str) -> None:
+    con.execute("UPDATE onboarding SET recency_tpr=?, updated_at=? WHERE id=1", (tpr, _now()))
+    con.commit()
+    write_config(con)
+
+
+def list_positions(con) -> list[dict]:
+    return [dict(r) for r in con.execute(
+        "SELECT title, display FROM tracked_positions ORDER BY created_at"
+    ).fetchall()]
+
+
+def write_config(con) -> None:
+    """Atomically update config.json: set search.target_keywords/location/recency_tpr."""
+    import config as _config
+
+    # Read the existing config (or fall back to example)
+    cfg_path = _config._CONFIG_PATH
+    example_path = _config.ROOT / "config.example.json"
+    if cfg_path.exists():
+        with cfg_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    elif example_path.exists():
+        with example_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = {}
+
+    positions = list_positions(con)
+    keywords = [p["display"] for p in positions]
+
+    onb = get_onboarding(con)
+    loc = onb.get("location") or ""
+    tpr = onb.get("recency_tpr") or "r86400"
+
+    search = data.setdefault("search", {})
+    search["target_keywords"] = keywords
+    if loc:
+        search["target_location"] = loc
+    search["recency_tpr"] = tpr
+
+    tmp = str(cfg_path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, str(cfg_path))
 
 
 def highlight(text, evidence) -> str:

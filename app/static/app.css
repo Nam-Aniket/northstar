@@ -250,6 +250,20 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,te
 .js-reveal .reveal{opacity:0;transform:translateY(12px);transition:opacity .6s var(--ease-smooth),transform .6s var(--ease-smooth)}
 .js-reveal .reveal.in{opacity:1;transform:none}
 
+/* onboarding card */
+.ob-step{display:flex;flex-direction:column;gap:10px}
+.ob-step--disabled{opacity:.45;pointer-events:none}
+.ob-step-header{display:flex;align-items:center;gap:10px}
+.ob-step-num{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;background:rgb(var(--c-sand));color:rgb(var(--c-ink2));flex-shrink:0}
+.ob-step-num--done{background:rgb(var(--c-good-soft));color:rgb(var(--c-good-ink))}
+.ob-step-title{font-weight:600;font-size:14px;color:rgb(var(--c-ink))}
+.ob-step-body{padding-left:36px}
+.ob-dropzone{border:2px dashed rgb(var(--c-line));border-radius:var(--r-lg);background:rgb(var(--c-bg));transition:border-color var(--dur-fast)}
+.ob-dropzone:hover{border-color:rgb(var(--c-accent)/.5)}
+.ob-resume-uploaded{background:rgb(var(--c-good-soft));border:1px solid rgb(var(--c-good)/.3);border-radius:var(--r-lg);padding:14px 16px}
+.ob-error{padding:10px 14px;border-radius:var(--r-md);background:rgb(var(--c-bad-soft));color:rgb(var(--c-bad));font-size:13px}
+.ob-position-card{background:rgb(var(--c-paper));border:1px solid rgb(var(--c-line));border-radius:var(--r-lg);padding:8px 12px}
+
 @media (prefers-reduced-motion: reduce){
   *{transition:none!important;animation:none!important}
   .reveal{opacity:1;transform:none}

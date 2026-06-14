@@ -1,0 +1,21 @@
+<div id="positions-list">
+  <form hx-post="/onboarding/positions"
+        hx-target="#positions-list"
+        hx-swap="outerHTML"
+        class="flex gap-2 mb-3">
+    <input name="titles"
+           placeholder="Data Analyst, Business Analyst"
+           class="filter-select flex-1"
+           autocomplete="off">
+    <button type="submit" class="btn text-xs px-4">Add</button>
+  </form>
+  {% if positions %}
+  <div class="flex flex-col gap-1.5">
+    {% for p in positions %}
+      {% include "_position_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-muted">No roles added yet.</p>
+  {% endif %}
+</div>
