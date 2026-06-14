@@ -82,6 +82,9 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         next_day = ""
 
     onb_state = queries.onboarding_state(con)
+    if onb_state != "READY":
+        con.close()
+        return RedirectResponse("/onboarding", status_code=302)
     onb = queries.get_onboarding(con)
     positions = queries.list_positions(con)
     ctx = {
@@ -112,7 +115,7 @@ def onboarding_page(request: Request):
     onb = queries.get_onboarding(con)
     positions = queries.list_positions(con)
     con.close()
-    return templates.TemplateResponse(request, "_onboarding.html",
+    return templates.TemplateResponse(request, "onboarding.html",
                                       {"state": state, "onb": onb, "positions": positions})
 
 
