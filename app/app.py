@@ -11,7 +11,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -233,6 +233,28 @@ def tracker_export():
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=northstar_tracker.csv"},
     )
+
+
+@app.post("/builder/ai/summary")
+def builder_ai_summary(role: str = Form(""), details: str = Form(""), skills: str = Form("")):
+    try:
+        from resume_ai import generate_summary
+        return JSONResponse({"text": generate_summary(role, details, skills)})
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)})
+    except Exception as e:
+        return JSONResponse({"error": "AI request failed: " + str(e)})
+
+
+@app.post("/builder/ai/bullets")
+def builder_ai_bullets(role: str = Form(""), raw: str = Form("")):
+    try:
+        from resume_ai import improve_bullets
+        return JSONResponse({"text": improve_bullets(raw, role)})
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)})
+    except Exception as e:
+        return JSONResponse({"error": "AI request failed: " + str(e)})
 
 
 @app.get("/jobs/{row_key:path}", response_class=HTMLResponse)

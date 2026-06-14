@@ -48,7 +48,11 @@
 
     {# Summary #}
     <div>
-      <h2 class="section-h mb-3">Summary</h2>
+      <div class="flex items-center gap-2 mb-3">
+        <h2 class="section-h" style="margin-bottom:0">Summary</h2>
+        <button type="button" id="ai-summary" class="btn-open" style="padding:4px 10px;font-size:12px">&#10024; AI write</button>
+        <span id="ai-summary-spinner" class="spinner" style="display:none;width:14px;height:14px;border-width:2px"></span>
+      </div>
       <textarea id="f-summary" class="filter-select" rows="3"
         placeholder="2–3 sentences: who you are, what you bring, what you're targeting."></textarea>
     </div>
@@ -133,7 +137,9 @@
           '<input class="filter-select exp-company" type="text" placeholder="Acme Corp"></div>',
         '<div class="col-span-2"><label class="filter-label">Dates</label>',
           '<input class="filter-select exp-dates" type="text" placeholder="Jan 2022 – Present"></div>',
-        '<div class="col-span-2"><label class="filter-label">Bullet points (one per line)</label>',
+        '<div class="col-span-2"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label class="filter-label" style="margin-bottom:0">Bullet points (one per line)</label>',
+          '<button type="button" class="ai-bullets btn-open" style="padding:4px 10px;font-size:12px">&#10024; AI write</button>',
+          '<span class="ai-bullets-spinner spinner" style="display:none;width:14px;height:14px;border-width:2px"></span></div>',
           '<textarea class="filter-select exp-bullets" rows="4" placeholder="Reduced report run-time by 60% via query optimisation&#10;Built self-service dashboard used by 40+ stakeholders"></textarea></div>',
       '</div>',
     ].join('');
@@ -355,6 +361,66 @@
   function bindInputs() {
     document.querySelector('.panel').addEventListener('input', scheduleRender);
   }
+
+  /* ── AI helpers ─────────────────────────────────────────────────────────── */
+  function aiToast(msg) {
+    if (window.htmx) {
+      htmx.trigger(document.body, 'toast', {value: msg});
+    } else {
+      alert(msg);
+    }
+  }
+
+  function aiPost(url, formData, onSuccess, btn, spinner) {
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    fetch(url, {method: 'POST', body: formData})
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) { aiToast(data.error); }
+        else { onSuccess(data.text); }
+      })
+      .catch(function(e) { aiToast('AI request failed: ' + e); })
+      .finally(function() {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+      });
+  }
+
+  /* Summary AI button */
+  document.getElementById('ai-summary').addEventListener('click', function () {
+    var btn = this;
+    var spinner = document.getElementById('ai-summary-spinner');
+    var firstRole = '';
+    var firstBlock = document.querySelector('.exp-block .exp-role');
+    if (firstBlock) firstRole = firstBlock.value.trim();
+    var fd = new FormData();
+    fd.append('role', firstRole);
+    fd.append('details', document.getElementById('f-summary').value);
+    fd.append('skills', document.getElementById('f-skills').value);
+    aiPost('/builder/ai/summary', fd, function(text) {
+      document.getElementById('f-summary').value = text;
+      scheduleRender();
+    }, btn, spinner);
+  });
+
+  /* Bullets AI buttons — event delegation on exp-list */
+  document.getElementById('exp-list').addEventListener('click', function(e) {
+    var btn = e.target.closest('.ai-bullets');
+    if (!btn) return;
+    var block = btn.closest('.exp-block');
+    if (!block) return;
+    var spinner = block.querySelector('.ai-bullets-spinner');
+    var roleInput = block.querySelector('.exp-role');
+    var bulletsTA = block.querySelector('.exp-bullets');
+    var fd = new FormData();
+    fd.append('role', roleInput ? roleInput.value.trim() : '');
+    fd.append('raw', bulletsTA ? bulletsTA.value : '');
+    aiPost('/builder/ai/bullets', fd, function(text) {
+      if (bulletsTA) { bulletsTA.value = text; }
+      scheduleRender();
+    }, btn, spinner);
+  });
 
   /* ── Init ───────────────────────────────────────────────────────────────── */
   var restored = restoreLocal();
