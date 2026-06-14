@@ -1,243 +1,174 @@
-# Northstar
+<h1 align="center">Northstar</h1>
 
-**A local, private, open-source job-matching engine.** Tell it your target roles and
-your skills, and it pulls live job postings and ranks them by how well each one fits
-**you** — a deterministic **Fit %** based on the share of a posting's requirements your
-skills actually cover. No account, no cloud, no subscription. Your résumé and data
-never leave your machine.
+<p align="center"><strong>Your job hunt, finally under control.</strong></p>
 
-> ### ⚠️ Local & self-hosted — read this first
-> Northstar runs entirely on your own computer. **You are the operator**, and you are
-> responsible for complying with the terms of service of any site it fetches from
-> (including LinkedIn). It is intended for personal job-seeking use at human volume.
-> The software is provided **as-is, with no warranty** (see `LICENSE`).
+<p align="center">
+Northstar turns the chaos of a job search — forty open tabs, a spreadsheet you stopped updating, the same résumé fired at every role — into one calm dashboard that pulls live postings, ranks them by how well they fit <em>you</em>, and remembers everything. It runs entirely on your own machine. Your résumé and your data never leave it.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT">
+  <img src="https://img.shields.io/badge/Python-3.11%2B-blue.svg" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/Local--first-no%20cloud-orange.svg" alt="Local-first, no cloud">
+  <img src="https://img.shields.io/badge/Scoring-deterministic-8A2BE2.svg" alt="Deterministic scoring">
+</p>
+
+<p align="center">
+  <!-- SHOT 1 (hero): docs/screenshots/hero-board-light.png — the Board in light mode -->
+  <img src="docs/screenshots/hero-board-light.png" alt="The Northstar board: live job postings ranked by Fit %" width="100%">
+</p>
 
 ---
+
+## The problem
+
+If you have ever job-hunted seriously, you know the drill.
+
+You open ten tabs of listings. You start a spreadsheet to "stay organised." By Thursday the spreadsheet is three days stale and you genuinely cannot remember whether you applied to that one good role or just meant to. You send the **same résumé** to a data-analyst job and a BI job because tailoring each one by hand is exhausting. Half your applications vanish into an ATS black hole. And the best-fit role — the one actually worth your energy — is buried somewhere on page four, looking identical to forty roles that aren't worth it.
+
+Job hunting is a second full-time job, and the tooling for it is a browser with too many tabs and a sense of guilt.
+
+**The real cost isn't the admin. It's the good roles you never properly chased because everything blurred together.**
+
+## Why I built this
+
+I built Northstar while job-hunting myself. I didn't want another cloud SaaS that wanted my résumé, my email, and a subscription. I wanted one quiet place on my own laptop that could answer three questions every morning:
+
+1. *What's actually new today?*
+2. *Which of these genuinely fit my skills — not just keyword-match, but fit?*
+3. *What have I already done about each one?*
+
+Northstar is the answer to those three questions. It's free, it's open-source, and it's yours.
 
 ## What it does
 
-1. **Searches** live job postings for your target roles + location.
-2. **Scores** every posting with a transparent, deterministic **Fit %** =
-   `requirements you can evidence ÷ all requirements in the posting`. The *ranking* is
-   the product; the strong/fair bands are advisory.
-3. **Shows** you a polished local web app — a Ramos-inspired UI in light or dark —
-   with everything you need to run a job hunt:
-   - **Board** — your postings ranked by Fit %, with day-by-day navigation and a score
-     gauge on each card.
-   - **Job detail** — the full JD with your matched requirements highlighted, the score
-     breakdown, and one-click *Open* / *Mark applied* (kept separate, so opening a link
-     never silently marks it applied).
-   - **Insights** — score distribution, sectors, and an application funnel.
-   - **People** — a lightweight outreach tracker; add companies and contacts by hand.
-   - **Tracker** — an Excel-style table of every application with editable status.
-   - **Builder** — a résumé builder with a live preview and one-click `.docx` export
-     (with optional AI assistance).
+Northstar runs the whole loop — **find → rank → tailor → track** — from a single button.
 
-The scorer is fully deterministic (no LLM, no ML) — the same inputs always give the
-same scores, and every score is explainable. The optional AI résumé helper is the only
-part that calls a model, and it is strictly opt-in.
+### Find & rank every role by real fit
 
----
+It pulls live postings for your target roles and scores each one with a transparent **Fit %**: the share of *that posting's* requirements your skills actually cover. No keyword soup, no black-box ML — the same inputs always produce the same score, and every score is explainable. The best-fit roles rise to the top; the day nav lets you work through today's batch and leave the rest for later.
 
-## Quickstart
+<p align="center">
+  <!-- SHOT 2: docs/screenshots/board-dark.png — board in dark mode -->
+  <img src="docs/screenshots/board-dark.png" alt="The board in dark mode" width="100%">
+  <br><em>Light or dark — every role ranked by how well it fits you, newest first.</em>
+</p>
 
-### One-command path (recommended)
+### See exactly why a role matched
 
-```bash
-git clone <your-fork-url> northstar && cd northstar
+Open any posting to see the full job description with your matched requirements highlighted, the score breakdown, and your tailored résumé right there. *Open* and *Mark applied* are deliberately separate buttons — opening a link never silently marks it done.
 
-# Creates the venv, installs everything, and opens the app — one command:
-python3 bootstrap.py
-```
+<p align="center">
+  <!-- SHOT 3: docs/screenshots/job-detail.png — job detail with highlights -->
+  <img src="docs/screenshots/job-detail.png" alt="A job detail page with matched requirements highlighted and a Fit breakdown" width="100%">
+  <br><em>Every score is explainable: the requirements you cover, the gaps, and the JD terms to add.</em>
+</p>
 
-On macOS / Linux you can also use the shell wrapper:
+### Understand your whole hunt at a glance
 
-```bash
-./run.sh
-```
+The Insights page turns your pipeline into a story: where your Fit scores cluster, which sectors are hiring, which skills keep costing you roles, and how far each application has progressed.
 
-On Windows:
+<p align="center">
+  <!-- SHOT 4: docs/screenshots/insights.png — insights dashboard -->
+  <img src="docs/screenshots/insights.png" alt="The Insights dashboard: score distribution, sectors, and application funnel" width="100%">
+  <br><em>Stop guessing whether the hunt is working. See it.</em>
+</p>
 
-```
-run.bat
-```
+### Build a clean, ATS-safe résumé in minutes
 
-`bootstrap.py` is idempotent — on subsequent runs it checks whether
-`requirements.txt` has changed and only re-installs when needed, then launches
-immediately. Pass `--no-launch` to set up the venv without starting the server
-(useful for CI or testing).
+The Builder is a from-scratch résumé editor: fill in your details on the left, watch an ATS-safe single-column résumé render live on the right, and download a clean `.docx` in one click. Everything is your own content — nothing is invented. Optional AI assistance (strictly opt-in, your own API key) turns rough notes into polished bullet points, with a hard guard against fabricating or moving numbers.
 
-Once the server is running, configure your profile:
+<p align="center">
+  <!-- SHOT 5: docs/screenshots/builder.png — résumé builder split view -->
+  <img src="docs/screenshots/builder.png" alt="The résumé Builder: editable form on the left, live preview on the right" width="100%">
+  <br><em>Edit on the left, watch it render on the right, download a clean .docx.</em>
+</p>
 
-```bash
-# Tell Northstar who you are and what you want
-python3 build_profile.py --resume path/to/your_resume.docx   # generates skills.json
-# …then open skills.json and review the supported_skills list
-cp config.example.json config.json      # target roles, location, recency, work-rights
-# …then edit config.json in your editor
-```
+### Never lose track again
 
-Then, in the app, click **Run** to fetch and score postings.
+One **Run** button does everything — search, fetch descriptions, dedupe, score, rebuild the board — in the background with a live progress bar. Your applied / starred / noted state and any contacts you add live in a separate database zone that **survives every run**, so a daily refresh never wipes your work.
 
-### Manual / advanced path
+<p align="center">
+  <!-- SHOT 6: docs/screenshots/run-progress.png — Run button with progress bar -->
+  <img src="docs/screenshots/run-progress.png" alt="The Run button mid-pipeline with a live progress bar" width="70%">
+</p>
 
-If you prefer to manage your own virtual environment:
-
-```bash
-git clone <your-fork-url> northstar && cd northstar
-python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-# Tell Northstar who you are and what you want
-python build_profile.py --resume path/to/your_resume.docx
-cp config.example.json config.json
-
-# Open the app
-./run_app.sh                            # macOS / Linux  (Windows: run_app.bat)
-```
-
-> **Windows:** use `run_app.bat` instead of `run_app.sh`. Everything else is the same —
-> the pipeline is pure Python. For the optional daily auto-run, use **Task Scheduler**
-> (command shown in [Run it daily](#run-it-daily-frictionlessly)) instead of launchd.
-
-Then, in the app, click **Run** — Northstar fetches postings, scores them, and refreshes
-the board for you. That's the whole loop. (Prefer the terminal? `python daily_run.py`
-does the same thing in one command.)
-
-### Run it daily, frictionlessly
-
-Everything — search, JD fetch, dedupe, scoring, and the dashboard rebuild — is behind a
-single command and a single button:
-
-- **In the app:** the **Run** button runs the full pipeline in the background with a live
-  progress bar, then refreshes the board. No terminal needed.
-- **One command:** `python daily_run.py` (the Run button calls exactly this).
-- **Automatic, once a day (opt-in):** point your scheduler at the same command.
-  - **macOS (launchd):** edit the two `__PLACEHOLDERS__` in
-    `scripts/com.northstar.dailyrun.plist.template`, copy it to
-    `~/Library/LaunchAgents/com.northstar.dailyrun.plist`, then
-    `launchctl load ~/Library/LaunchAgents/com.northstar.dailyrun.plist`.
-  - **Linux / macOS (cron):** `30 8 * * * cd <ROOT> && <venv>/bin/python daily_run.py >> app/daily_run.log 2>&1`
-  - **Windows (Task Scheduler):** `schtasks /Create /SC DAILY /ST 08:30 /TN NorthstarDaily /TR "<python> <ROOT>\daily_run.py"`
-
-Your application state — what you've applied to, starred, or noted, and any contacts you
-added by hand — is kept in a separate database zone and **survives every run**.
-
-### Configure your files
-
-- **`skills.json`** — `supported_skills` (everything you can genuinely claim) and
-  `unsupported_skills` (tools you don't have). These drive your Fit %. Each entry lists
-  aliases so spelling/phrasing variants in a JD still match. **Quickest way:** run the
-  profile generator (below) instead of hand-editing.
-
-- **`config.json`** — your identity line, `target_keywords` (roles to search),
-  `target_location`, `recency_tpr` (`r86400` = 24h), and matching options
-  (`needs_sponsorship`, `seniority_cap`, `keep_threshold`).
-
-- **`facts.json`** *(optional, only for tailored résumé generation)* — your real
-  experience: `FACT_BANK` (truthful bullet variants tagged with the skills they
-  evidence), `EXPERIENCE_SLOTS` (job headers) and `BULLET_BUDGETS`. Copy
-  `facts.example.json` to `facts.json`, fill in your roles, then set
-  `generation_enabled: true` in `config.json`. When absent, the generator falls back
-  to the generic example and résumé generation stays off. Like `skills.json` and
-  `config.json`, it is gitignored, so your real content is never committed.
-
-### Building your skill profile
-
-Instead of hand-authoring `skills.json`, generate it from your résumé:
-
-```bash
-python build_profile.py --resume path/to/your_resume.docx
-```
-
-Then review `skills.json` — add any skills the matcher missed and remove false positives.
-`unsupported_skills` lists everything in the taxonomy **not** found on your résumé; these
-are tracked as gaps and lower your Fit % when a JD requires them.
-
-**Supported input formats:** `.docx` (recommended), `.md` / `.txt`, and `.pdf`
-(requires `pip install pypdf`; otherwise pass `--text "..."` or pipe text on stdin).
-
-**Optional LLM pass** (catches skills the deterministic matcher may miss):
-
-```bash
-python build_profile.py --resume resume.docx --llm
-```
-
-Requires `LLM_API_KEY` in `.env`. If the key is missing or the call fails, it falls back
-to the deterministic result. The matcher alone covers ~150–250 labelled skills across
-Programming, Data & BI, Data Engineering, Data Science, Business Delivery, Soft Skills,
-and Finance & Commercial. Extend `taxonomy.json` to add more.
+<p align="center">
+  <!-- SHOT 7: docs/screenshots/tracker.png — application tracker table -->
+  <img src="docs/screenshots/tracker.png" alt="The Tracker: a table of every application with editable status" width="100%">
+  <br><em>Every application in one editable table — nothing slips through the cracks.</em>
+</p>
 
 ---
 
-## The Résumé Builder
+## Your data stays yours
 
-The **Builder** page is a from-scratch résumé editor: fill in your details on the left,
-watch an ATS-safe single-column résumé render live on the right, and download a clean
-`.docx` in one click. Everything is your own content — nothing is invented.
+> ### Local & self-hosted — read this first
+> Northstar runs entirely on your own computer. There is no account, no cloud, no subscription, and nothing is ever uploaded. **You are the operator**, and you are responsible for complying with the terms of service of any site it fetches from (including LinkedIn). It is intended for personal job-seeking use at human volume. The software is provided **as-is, with no warranty** (see `LICENSE`).
 
-**Optional AI assistance** (needs `LLM_API_KEY` in `.env`): the **✨ AI write** buttons
-turn rough notes into polished, professional copy:
+The scorer is fully deterministic — no LLM, no ML, no telemetry. The only part that can call a model is the optional AI résumé helper, and it only runs if *you* supply an API key.
 
-- **Summary** — a 2–3 sentence professional summary tailored to your target role.
-- **Bullets** — your rough notes ("automated the monthly report with Python") become
-  strong XYZ-formula bullet points.
+## The plan — three steps to your first ranked board
 
-The AI helper has a hard anti-fabrication guard: it produces **one bullet per note**,
-preserves order, and **never invents or moves a number** between bullets. If you don't
-set an API key, the Builder still works fully — you just write the copy yourself.
+```bash
+# 1. Clone and launch (creates the venv, installs everything, opens the app)
+git clone <your-fork-url> northstar && cd northstar
+python3 bootstrap.py            # macOS/Linux: ./run.sh   ·   Windows: run.bat
 
-## People & outreach
+# 2. Tell Northstar who you are
+python3 build_profile.py --resume path/to/your_resume.docx   # builds skills.json
+cp config.example.json config.json                           # your roles, location, work-rights
+```
 
-The **People** page groups your contacts by company. You can:
+**3.** In the app, click **Run**. Northstar fetches today's postings, scores them, and refreshes your board. That's the whole loop. (Prefer the terminal? `python daily_run.py` does the same thing.)
 
-- **Add a company with its first contacts** from the People page.
-- **Add a person** to any company from that company's page.
-- Track per-person outreach status (not contacted → contacted → replied → …).
+> `bootstrap.py` is idempotent — later runs only re-install when `requirements.txt` changes, then launch immediately. Pass `--no-launch` for CI/setup-only.
 
-Hand-added companies and contacts are stored in a database zone that **survives every
-pipeline run**, so a daily refresh never wipes them.
+### Run it daily, hands-free (optional)
 
-## How scoring works
+Point any scheduler at `daily_run.py`:
 
-For each job, Northstar finds which of the posting's requirements you can evidence (from
-`supported_skills`), which you can't (from `unsupported_skills`), and which it couldn't
-classify. `Fit % ≈ covered ÷ (covered + lacked + unclassified)`. Requirements in the
-JD's "must-have" section count double. Hard gates (e.g. a role demanding citizenship you
-don't hold) apply as multiplicative caps, never as floors — so a posting with none of
-your skills scores low, not high.
+- **macOS (launchd):** fill the two `__PLACEHOLDERS__` in `scripts/com.northstar.dailyrun.plist.template`, copy to `~/Library/LaunchAgents/com.northstar.dailyrun.plist`, then `launchctl load` it.
+- **Linux/macOS (cron):** `30 8 * * * cd <ROOT> && <venv>/bin/python daily_run.py >> app/daily_run.log 2>&1`
+- **Windows (Task Scheduler):** `schtasks /Create /SC DAILY /ST 08:30 /TN NorthstarDaily /TR "<python> <ROOT>\daily_run.py"`
 
-To avoid over-confidence on thin postings, the denominator is **Laplace-smoothed**: a JD
-that lists only a couple of requirements you happen to match won't score a misleading
-100% — there simply isn't enough evidence. Evidence-rich postings are essentially
-unaffected. A "~ uncertain" flag also appears when a JD has too few recognised
-requirements to score confidently.
+## Configure your profile
+
+| File | What it holds | How to fill it |
+|---|---|---|
+| `skills.json` | `supported_skills` (what you can claim) + `unsupported_skills` (gaps). Drives your Fit %. | `python build_profile.py --resume your_resume.docx`, then review. |
+| `config.json` | Identity line, `target_keywords`, `target_location`, `recency_tpr` (`r86400` = 24h), `needs_sponsorship`, `seniority_cap`, `keep_threshold`. | `cp config.example.json config.json` and edit. |
+| `facts.json` *(optional)* | Real experience for tailored résumé generation: `FACT_BANK`, `EXPERIENCE_SLOTS`, `BULLET_BUDGETS`. | `cp facts.example.json facts.json`, fill in, set `generation_enabled: true`. |
+
+All three are **gitignored** — your real content is never committed.
+
+## How the Fit score works
+
+For each job, Northstar finds which of the posting's requirements you can evidence, which you can't, and which it couldn't classify:
+
+```
+Fit % ≈ covered ÷ (covered + lacked + unclassified)
+```
+
+Requirements in the JD's "must-have" section count double. Hard gates (e.g. a role demanding citizenship you don't hold) apply as multiplicative **caps**, never floors — so a posting with none of your skills scores low, not high. To avoid over-confidence on thin postings, the denominator is **Laplace-smoothed**, and a "~ uncertain" flag appears when a JD has too few recognised requirements to score confidently. The ranking is the product; the strong / fair bands are advisory.
 
 ## Project layout
 
 ```
 00_search_linkedin_guest.py   search live postings for your roles
 fill_missing_jds.py           fetch full job-description text
-prepare_job_posts.py          dedupe + authenticity filter (prefers the JD-enriched file)
+prepare_job_posts.py          dedupe + authenticity filter
 score_jobs.py                 the Fit % scorer (reads skills.json/config.json)
-config.py                     loads skills.json + config.json
+config.py                     loads skills.json / config.json / facts.json
 build_profile.py              generate skills.json from your résumé
 daily_run.py                  one-shot full refresh (search → score → dashboard)
-run_status.py                 progress/lock for the in-app Run button
-generate_accepted_resumes.py  tailored-résumé engine (OFF by default — see below)
+generate_accepted_resumes.py  tailored-résumé engine (opt-in)
 resume_docx.py                ATS-safe .docx writer used by the Builder
 app/                          the local FastAPI + HTMX web app
 scripts/                      opt-in daily-run scheduler templates
-docs/                         deeper guides
+docs/                         deeper guides + screenshots
 ```
-
-## Résumé generation (v2)
-
-A *tailored*-résumé generator (one résumé per matched job) is included but **off by
-default** (`generation_enabled: false`). It needs truthful, hand-authored bullets to
-select from, so the general-purpose version ships matching-first. For now, use the
-**Builder** page to produce résumés; a generic per-job generator is planned for v2.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](LICENSE). Build on it, fork it, make it yours.
