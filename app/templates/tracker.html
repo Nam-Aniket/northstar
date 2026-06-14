@@ -16,21 +16,25 @@
   <div class="kpi tip">
     <div class="l">Total roles</div>
     <div class="v">{{ summary.total }}</div>
+    <div class="text-xs text-muted mt-1">in pipeline</div>
     <span class="tip__bubble">All scored jobs from the pipeline (match_score not null).</span>
   </div>
   <div class="kpi tip">
     <div class="l">Applied</div>
     <div class="v text-leaf">{{ summary.applied }}</div>
+    <div class="text-xs text-muted mt-1">of {{ summary.total }}</div>
     <span class="tip__bubble">Jobs you have marked as applied.</span>
   </div>
   <div class="kpi tip">
     <div class="l">Interviewing</div>
     <div class="v text-clay">{{ summary.interviewing }}</div>
+    <div class="text-xs text-muted mt-1">active rounds</div>
     <span class="tip__bubble">Roles with status Phone Screen or Interview.</span>
   </div>
   <div class="kpi tip">
     <div class="l">Offers</div>
     <div class="v" style="color:rgb(var(--c-good))">{{ summary.offers }}</div>
+    <div class="text-xs text-muted mt-1">received</div>
     <span class="tip__bubble">Roles where you have received an offer.</span>
   </div>
 </div>
