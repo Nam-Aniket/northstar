@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
 {% block title %}{{ j.role_title }} · {{ j.company }}{% endblock %}
 {% block content %}
 <a href="/" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-clay transition-colors mb-4">
@@ -7,7 +8,7 @@
 
 <div class="panel p-5 mb-5">
   <div class="flex items-start gap-4">
-    <div class="gauge {{ j.score_tone }}" style="--p:{{ j.match_score }}"><span>{{ j.match_score }}</span></div>
+    <span class="tip">{{ ui.gauge(j.match_score, j.score_tone, 'Fit') }}<span role="tooltip" class="tip__bubble">Fit {{ j.match_score }}% — how well your skills cover this job's requirements.</span></span>
     <div class="min-w-0 flex-1">
       <h1 class="font-display text-2xl leading-tight">{{ j.role_title }}</h1>
       <a href="/company/{{ j.company|normco|urlk }}" class="text-ink2 mt-0.5 hover:text-clay transition-colors no-underline block">{{ j.company }}</a>
@@ -53,7 +54,7 @@
       <h2 class="section-h">Tailored resume</h2>
       {% if j.has_resume %}
         <div class="flex items-center gap-3 mb-3">
-          <div class="gauge {{ 'high' if j.self_check_passes_target else 'low' }}" style="--p:{{ j.self_check_match_rate }};width:48px;height:48px"><span style="font-size:15px">{{ j.self_check_match_rate }}</span></div>
+          {{ ui.gauge(j.self_check_match_rate, 'high' if j.self_check_passes_target else 'low', 'ATS') }}
           <div class="text-sm"><div class="font-medium">ATS self-check</div>
             <div class="text-muted text-xs">{{ 'Passes target' if j.self_check_passes_target else 'Below target' }}{% if j.role_family %} · {{ j.role_family.replace('_',' ')|title }}{% endif %}</div></div>
         </div>

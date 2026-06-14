@@ -35,11 +35,12 @@
   <aside class="lg:sticky lg:top-20 self-start">
     <form hx-get="/" hx-target="#joblist" hx-swap="innerHTML"
           hx-trigger="change, keyup changed delay:300ms from:input[name='q']"
+          hx-indicator="#filter-spin"
           class="panel p-4 flex flex-col gap-5">
       <input type="hidden" name="day" value="{{ f.day }}">
       <input type="hidden" name="view" value="{{ f.view }}">
       <div>
-        <label for="q" class="filter-label">Search</label>
+        <label for="q" class="filter-label flex items-center gap-2">Search <span id="filter-spin" class="htmx-indicator spinner" style="width:11px;height:11px;color:rgb(var(--c-accent))" aria-hidden="true"></span></label>
         <div class="relative">
           <svg viewBox="0 0 24 24" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input id="q" name="q" value="{{ f.q }}" placeholder="company, role…" autocomplete="off" class="filter-select pl-9">

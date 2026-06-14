@@ -1,0 +1,10 @@
+{% macro gauge(value, tone, sublabel='Fit') %}
+<svg class="gauge {{ tone }}" viewBox="0 0 36 36" role="img" aria-label="{{ sublabel }} score {{ value }} of 100">
+  <g transform="rotate(-90 18 18)">
+    <circle class="gtrack" cx="18" cy="18" r="15.5"></circle>
+    <circle class="gfill" cx="18" cy="18" r="15.5" style="--val:{{ value }}"></circle>
+  </g>
+  <text class="gnum" x="18" y="18" text-anchor="middle" dominant-baseline="central">{{ value }}</text>
+  <text class="glbl" x="18" y="27" text-anchor="middle">{{ sublabel }}</text>
+</svg>
+{% endmacro %}
