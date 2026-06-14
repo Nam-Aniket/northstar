@@ -66,7 +66,6 @@
 
   <div id="toast" class="ns-toast-wrap"></div>
 
-  <div class="ns-cursor-ring" aria-hidden="true"></div>
   <div class="ns-cursor-dot" aria-hidden="true"></div>
 
   <script>
@@ -96,32 +95,39 @@
       } catch (e) {}
     }
 
-    /* Custom cursor — dot tracks instantly, ring trails with lerp */
+    /* Custom cursor — single coral dot that stretches toward its motion.
+       The RAF loop runs ONLY while the pointer is moving (idle = no CPU). */
     if (finePointer && !reduceMotion) {
       var dot = document.querySelector('.ns-cursor-dot');
-      var ring = document.querySelector('.ns-cursor-ring');
-      if (dot && ring) {
+      if (dot) {
         document.body.style.cursor = 'none';
-        var mx = window.innerWidth / 2, my = window.innerHeight / 2;
-        var rx = mx, ry = my;
+        var tx = window.innerWidth / 2, ty = window.innerHeight / 2;
+        var cx = tx, cy = ty, raf = null, hovering = false;
         document.addEventListener('mousemove', function (e) {
-          mx = e.clientX; my = e.clientY;
-          dot.style.transform = 'translate(' + mx + 'px,' + my + 'px)';
+          tx = e.clientX; ty = e.clientY;
+          if (!raf) raf = requestAnimationFrame(loop);
         }, { passive: true });
-        function ringRaf() {
-          rx += (mx - rx) * 0.18; ry += (my - ry) * 0.18;
-          ring.style.transform = 'translate(' + rx + 'px,' + ry + 'px)';
-          requestAnimationFrame(ringRaf);
+        function loop() {
+          var dx = tx - cx, dy = ty - cy;
+          cx += dx * 0.35; cy += dy * 0.35;
+          var speed = Math.min(Math.sqrt(dx * dx + dy * dy), 60) / 60;
+          if (hovering || speed < 0.02) {
+            dot.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
+          } else {
+            var ang = Math.atan2(dy, dx) * 180 / Math.PI;
+            dot.style.transform = 'translate(' + cx + 'px,' + cy + 'px) rotate(' + ang + 'deg) scale(' + (1 + speed * 0.7) + ',' + (1 - speed * 0.45) + ')';
+          }
+          if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) { raf = requestAnimationFrame(loop); }
+          else { dot.style.transform = 'translate(' + cx + 'px,' + cy + 'px)'; raf = null; }
         }
-        requestAnimationFrame(ringRaf);
         var hoverSel = 'a,button,[role=button],.statlink,.panel,input,select,textarea,summary';
         document.addEventListener('mouseover', function (e) {
-          if (e.target.closest && e.target.closest(hoverSel)) ring.classList.add('is-hover');
+          if (e.target.closest && e.target.closest(hoverSel)) { hovering = true; dot.classList.add('is-hover'); }
         });
         document.addEventListener('mouseout', function (e) {
           if (e.target.closest && e.target.closest(hoverSel) &&
               !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(hoverSel))) {
-            ring.classList.remove('is-hover');
+            hovering = false; dot.classList.remove('is-hover');
           }
         });
       }

@@ -368,4 +368,10 @@ def run_start(request: Request):
 @app.get("/run/status", response_class=HTMLResponse)
 def run_status_view(request: Request):
     import run_status
-    return templates.TemplateResponse(request, "_run_progress.html", {"st": run_status.read()})
+    st = run_status.read()
+    # A finished run refreshes the board once; then reset to idle so the progress
+    # widget stops re-triggering that refresh on every page load (else it loops).
+    if st.get("stage") == "done":
+        run_status.write(stage="idle", pct=0, message="", started_at=None,
+                         finished_at=None, ok=None, error_stage=None, error_detail=None)
+    return templates.TemplateResponse(request, "_run_progress.html", {"st": st})

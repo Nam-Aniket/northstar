@@ -135,7 +135,15 @@ body{background:rgb(var(--c-bg));color:rgb(var(--c-ink));font-family:'Urbanist',
 .stat{position:relative;background:rgb(var(--c-paper));border:1px solid rgb(var(--c-line));border-radius:var(--r-lg);padding:22px 24px;box-shadow:var(--shadow);transition:transform var(--dur-mid) var(--ease-bounce),box-shadow var(--dur-mid) var(--ease-bounce),border-color var(--dur-mid);cursor:pointer}
 .statlink:hover .stat{transform:translateY(-4px);box-shadow:var(--shadow-hi);border-color:rgb(var(--c-accent)/.35)}
 .stat .lbl{font-size:var(--fs-sm);color:rgb(var(--c-ink2));font-weight:600;display:flex;justify-content:space-between;align-items:center}
-.stat .num{font-family:'Urbanist','Helvetica Neue',Arial,sans-serif;font-weight:800;font-size:var(--fs-2xl);line-height:1;letter-spacing:-.02em;margin-top:5px}
+.stat .num{font-family:'Urbanist','Helvetica Neue',Arial,sans-serif;font-weight:800;font-size:var(--fs-2xl);line-height:1;letter-spacing:-.02em;margin-top:2px;color:rgb(var(--c-ink))}
+/* Ramos colourful circular icon stickers */
+.stat-badge{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:50%;color:#fff;margin-bottom:14px;box-shadow:var(--shadow-hair)}
+.stat-badge svg{width:20px;height:20px}
+.stat-badge--clay{background:rgb(var(--c-accent))}
+.stat-badge--leaf{background:rgb(var(--c-good))}
+.stat-badge--gold{background:rgb(var(--c-warn));color:rgb(var(--c-ink))}
+.stat-badge--ink{background:rgb(var(--c-ink))}
+.statlink:hover .stat-badge{transform:scale(1.08) rotate(-6deg);transition:transform var(--dur-mid) var(--ease-bounce)}
 
 /* forms / panels */
 .filter-label{display:block;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:rgb(var(--c-ink2));margin-bottom:7px}
@@ -221,10 +229,8 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,te
 .run-err pre{font-size:11px;white-space:pre-wrap;word-break:break-all;opacity:.8;margin-top:4px;width:100%}
 
 /* ── Ramos custom cursor (pointer:fine only; JS sets body{cursor:none}) ─────── */
-.ns-cursor-dot,.ns-cursor-ring{position:fixed;top:0;left:0;pointer-events:none;z-index:9999;border-radius:50%;will-change:transform}
-.ns-cursor-dot{width:7px;height:7px;margin:-3.5px 0 0 -3.5px;background:rgb(var(--c-accent))}
-.ns-cursor-ring{width:34px;height:34px;margin:-17px 0 0 -17px;border:1.5px solid rgb(var(--c-accent)/.55);transition:width .22s var(--ease-bounce),height .22s var(--ease-bounce),margin .22s var(--ease-bounce),background-color .22s ease,border-color .22s ease}
-.ns-cursor-ring.is-hover{width:54px;height:54px;margin:-27px 0 0 -27px;background:rgb(var(--c-accent)/.1);border-color:rgb(var(--c-accent)/.8)}
+.ns-cursor-dot{position:fixed;top:0;left:0;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;pointer-events:none;z-index:9999;background:rgb(var(--c-accent));will-change:transform;transition:width .2s var(--ease-bounce),height .2s var(--ease-bounce),margin .2s var(--ease-bounce),background-color .2s ease}
+.ns-cursor-dot.is-hover{width:30px;height:30px;margin:-15px 0 0 -15px;background:rgb(var(--c-accent)/.35)}
 
 /* ── Reveal-on-scroll (only hides once JS opts in via .js-reveal on <html>) ─── */
 .js-reveal .reveal{opacity:0;transform:translateY(12px);transition:opacity .6s var(--ease-smooth),transform .6s var(--ease-smooth)}
@@ -234,4 +240,4 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,te
   *{transition:none!important;animation:none!important}
   .reveal{opacity:1;transform:none}
 }
-@media (hover:none),(pointer:coarse){.ns-cursor-dot,.ns-cursor-ring{display:none}}
+@media (hover:none),(pointer:coarse){.ns-cursor-dot{display:none}}
