@@ -97,19 +97,15 @@ One **Run** button does everything (search, fetch descriptions, dedupe, score, r
 
 The scorer is fully deterministic: no LLM, no ML, no telemetry. The only part that can call a model is the optional AI résumé helper, and it only runs if *you* supply an API key.
 
-## Getting started, three steps to your first ranked board
+## Getting started, two steps to your first ranked board
 
 ```bash
-# 1. Clone and launch (creates the venv, installs everything, opens the app)
+# Clone and launch — creates the venv, installs everything, opens the app
 git clone https://github.com/Nam-Aniket/northstar.git && cd northstar
 python3 bootstrap.py            # macOS/Linux: ./run.sh   ·   Windows: run.bat
-
-# 2. Tell Northstar who you are
-python3 build_profile.py --resume path/to/your_resume.docx   # builds skills.json
-cp config.example.json config.json                           # your roles, location, work-rights
 ```
 
-**3.** Open the in-app **Setup** page to confirm your résumé, locations, and tracked roles, then click **Build your board**. Northstar fetches today's postings, scores them, and refreshes your board. That's the whole loop. (Prefer the terminal? `python daily_run.py` does the same thing.)
+The app opens on the **Setup** page. Drop in your résumé — Northstar reads your skills straight from it — then add your locations and target roles and click **Build your board**. It fetches today's postings, scores each by Fit %, and refreshes your board. That's the whole loop; no terminal needed past the launch above. (Prefer the terminal? `python daily_run.py` runs the same fetch-score-build, and `python build_profile.py --resume your_resume.docx` rebuilds your skills without the UI.)
 
 <p align="center">
   <img src="docs/screenshots/onboarding.png" alt="The Setup page: a guided three-step first run" width="62%">
