@@ -207,19 +207,84 @@ def set_status(con, row_key, status, commit=True):
         con.commit()
 
 
+def _norm_skill(s: str) -> str:
+    """Casefold + collapse whitespace so 'SQL'/'sql', 'Power  BI'/'Power BI' group.
+    Terms come from the scorer's controlled term bank, so they're already fairly
+    canonical - this is a light touch, not NLP."""
+    return re.sub(r"\s+", " ", (s or "").strip()).casefold()
+
+
+def _fit_tone(f: int) -> str:
+    """Strategic colour: green = strong fit, amber = borderline, gray = weak."""
+    return "good" if f >= 75 else ("warn" if f >= 68 else "muted")
+
+
 def insights(con, sector=None, day=None) -> dict:
+    from collections import Counter, defaultdict
+    from statistics import mean
+
     rows = [d for d in (_shape(r) for r in con.execute(JOB_SELECT).fetchall())
             if not d["dismissed"] and d["match_score"] is not None]
     if sector:
         rows = [d for d in rows if d.get("sector") == sector]
     if day and day != "all":
         rows = [d for d in rows if d["job_day"] == day]
-    buckets = [(70, 74), (75, 79), (80, 84), (85, 89), (90, 94), (95, 100)]
-    hist = [{"label": f"{lo}-{hi}", "count": sum(1 for d in rows if lo <= (d["match_score"] or 0) <= hi)}
-            for lo, hi in buckets]
-    from collections import Counter
-    sec = Counter(d.get("sector") or "other" for d in rows)
-    sectors = [{"sector": k, "count": v} for k, v in sec.most_common()]
+
+    # ── single pass: scores, sectors, skills ────────────────────────────────
+    ev_count, gp_count = Counter(), Counter()
+    ev_disp, gp_disp = {}, {}
+    ev_roles, gp_roles = defaultdict(list), defaultdict(list)
+    sec_scores = defaultdict(list)
+    for d in rows:
+        sec_scores[d.get("sector") or "other"].append(d["match_score"] or 0)
+        for s in d["evidence_list"]:
+            k = _norm_skill(s)
+            if not k:
+                continue
+            ev_count[k] += 1
+            ev_disp.setdefault(k, s.strip())
+            if d.get("company"):
+                ev_roles[k].append(d["company"])
+        for s in d["gaps_list"]:
+            k = _norm_skill(s)
+            if not k:
+                continue
+            gp_count[k] += 1
+            gp_disp.setdefault(k, s.strip())
+            if d.get("company"):
+                gp_roles[k].append(d["company"])
+
+    def _skills(counter, disp, roles, n):
+        out = []
+        for k, c in counter.most_common(n):
+            seen, uniq = set(), []
+            for co in roles[k]:
+                if co not in seen:
+                    seen.add(co)
+                    uniq.append(co)
+            out.append({"label": disp[k], "count": c,
+                        "roles": uniq[:6], "more": max(0, len(uniq) - 6)})
+        return out
+
+    strengths = _skills(ev_count, ev_disp, ev_roles, 10)
+    gaps_top = _skills(gp_count, gp_disp, gp_roles, 8)
+    strength_max = max((s["count"] for s in strengths), default=1)
+    gap_max = max((s["count"] for s in gaps_top), default=1)
+
+    # ── score histogram (honest: include a sub-70 bucket) ───────────────────
+    buckets = [("<70", 0, 69), ("70-74", 70, 74), ("75-79", 75, 79),
+               ("80-84", 80, 84), ("85-89", 85, 89), ("90+", 90, 100)]
+    hist = [{"label": lab, "count": sum(1 for d in rows if lo <= (d["match_score"] or 0) <= hi)}
+            for lab, lo, hi in buckets]
+    mode = max(hist, key=lambda b: b["count"]) if any(b["count"] for b in hist) else None
+
+    # ── sectors: count + avg fit + tone (dual-encoded bar) ──────────────────
+    sectors = sorted(
+        ({"sector": k, "count": len(v), "avg_fit": round(mean(v)), "tone": _fit_tone(round(mean(v)))}
+         for k, v in sec_scores.items()),
+        key=lambda x: -x["count"])
+    sec_max = max((s["count"] for s in sectors), default=1)
+
     applied = sum(1 for d in rows if d["applied"])
     funnel = [
         {"label": "To review", "count": sum(1 for d in rows if not d["applied"])},
@@ -230,7 +295,29 @@ def insights(con, sector=None, day=None) -> dict:
     with_resume = sum(1 for d in rows if d["has_resume"])
     passes = sum(1 for d in rows if d.get("self_check_passes_target"))
     scores = [d["match_score"] for d in rows if d["match_score"]]
-    return {"total": len(rows), "score_hist": hist, "sectors": sectors, "funnel": funnel,
+
+    # ── insight-led captions (the "so what", with the key number to bold) ───
+    n = len(rows)
+    top_s = strengths[0] if strengths else None
+    top_g = gaps_top[0] if gaps_top else None
+    best_sec = max(sectors, key=lambda s: s["avg_fit"]) if sectors else None
+    vol_sec = sectors[0] if sectors else None
+    cap = {
+        "score": (f"Most roles land in the {mode['label']} fit band - {n} active in total." if mode else ""),
+        "sector": ((f"{best_sec['sector'].replace('_', ' ').title()} fits you best (avg {best_sec['avg_fit']})"
+                    + (f", while {vol_sec['sector'].replace('_', ' ').title()} brings the most roles ({vol_sec['count']})."
+                       if vol_sec and vol_sec['sector'] != best_sec['sector'] else "."))
+                   if best_sec else ""),
+        "strengths": (f"{top_s['label']} is your most in-demand strength - evidenced in {top_s['count']} of {n} roles."
+                      if top_s else "No matched skills yet - run the pipeline to populate this."),
+        "gaps": (f"{top_g['label']} is the gap that recurs most - wanted in {top_g['count']} roles you don't fully cover."
+                 if top_g else "No recurring skill gaps surfaced - nice."),
+    }
+
+    return {"total": n, "score_hist": hist, "score_mode": mode["label"] if mode else None,
+            "sectors": sectors, "sec_max": sec_max, "funnel": funnel,
+            "strengths": strengths, "strength_max": strength_max,
+            "gaps_top": gaps_top, "gap_max": gap_max, "cap": cap,
             "ats": {"with_resume": with_resume, "passes": passes, "below": with_resume - passes},
             "applied": applied, "score_avg": round(sum(scores) / len(scores), 1) if scores else 0}
 

@@ -19,53 +19,103 @@
 </div>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-  <div class="kpi"><div class="l">Active roles</div><div class="v">{{ d.total }}</div></div>
-  <div class="kpi"><div class="l">Average fit</div><div class="v text-clay">{{ d.score_avg }}</div></div>
-  <div class="kpi"><div class="l">Applied</div><div class="v text-leaf">{{ d.applied }}</div></div>
-  <div class="kpi"><div class="l">Resumes ready</div><div class="v">{{ d.ats.passes }}<span style="font-size:15px;color:rgb(var(--c-muted))">/{{ d.ats.with_resume }}</span></div></div>
+  <div class="kpi reveal"><div class="l">Active roles</div><div class="v">{{ d.total }}</div></div>
+  <div class="kpi reveal"><div class="l">Average fit</div><div class="v text-clay">{{ d.score_avg }}</div></div>
+  <div class="kpi reveal"><div class="l">Applied</div><div class="v text-leaf">{{ d.applied }}</div></div>
+  <div class="kpi reveal"><div class="l">Resumes ready</div><div class="v">{{ d.ats.passes }}<span style="font-size:15px;color:rgb(var(--c-muted))">/{{ d.ats.with_resume }}</span></div></div>
 </div>
 
+{# ── Where you stand: fit distribution + sector fit ──────────────────────── #}
 <div class="grid lg:grid-cols-2 gap-5">
   <div class="chart-card reveal">
-    <h2 class="section-h">Match-score distribution</h2>
+    <h2 class="section-h">Where your fit lands</h2>
+    <p class="chart-sub">{{ d.cap.score | swd | safe }}</p>
     {% set maxc = (d.score_hist | map(attribute='count') | max) or 1 %}
     <div class="hist">
       {% for b in d.score_hist %}
-      <div class="col"><div class="hv">{{ b.count }}</div>
-        <div class="hbar" style="height:{{ (b.count / maxc * 100) | round | int }}%"></div>
-        <div class="hx">{{ b.label }}</div></div>
+      <div class="col">
+        <div class="hv">{{ b.count }}</div>
+        <div class="hbar {{ 'hot' if b.label == d.score_mode }}" style="height:{{ (b.count / maxc * 100) | round | int }}%"></div>
+        <div class="hx">{{ b.label }}</div>
+      </div>
       {% endfor %}
     </div>
   </div>
 
   <div class="chart-card reveal">
-    <h2 class="section-h">Roles by sector</h2>
-    {% set maxs = (d.sectors | map(attribute='count') | max) or 1 %}
+    <h2 class="section-h">Fit by sector - aim here</h2>
+    <p class="chart-sub">{{ d.cap.sector | swd | safe }}</p>
     {% for s in d.sectors %}
-    <div class="bar-row">
-      <span class="blabel">{{ s.sector.replace('_',' ') }}</span>
-      <div class="bar-track"><div class="bar-fill" style="width:{{ (s.count / maxs * 100) | round | int }}%"></div></div>
-      <span class="bar-val">{{ s.count }}</span>
+    <div class="sbar tip" tabindex="0">
+      <span class="sbar-label">{{ s.sector.replace('_',' ') }}</span>
+      <span class="sbar-track"><span class="sbar-fill sbar-fill--{{ s.tone }}" style="width:{{ (s.count / d.sec_max * 100) | round | int }}%"></span></span>
+      <span class="sbar-val">{{ s.count }}</span>
+      <span role="tooltip" class="tip__bubble">{{ s.count }} role{{ 's' if s.count != 1 }} · average fit {{ s.avg_fit }}</span>
     </div>
     {% endfor %}
+    <div class="legend">
+      <span><i class="dot dot--good"></i>Strong fit (75+)</span>
+      <span><i class="dot dot--warn"></i>Borderline (68-74)</span>
+      <span><i class="dot dot--muted"></i>Weak (&lt;68)</span>
+    </div>
   </div>
 </div>
 
+{# ── The skill story: strengths vs gaps ─────────────────────────────────── #}
+<div class="grid lg:grid-cols-2 gap-5 mt-5">
+  <div class="chart-card reveal">
+    <h2 class="section-h"><i class="hdot hdot--good"></i>Skills winning you roles</h2>
+    <p class="chart-sub">{{ d.cap.strengths | swd | safe }}</p>
+    {% if d.strengths %}
+      {% for s in d.strengths %}
+      <div class="sbar tip" tabindex="0">
+        <span class="sbar-label">{{ s.label }}</span>
+        <span class="sbar-track"><span class="sbar-fill sbar-fill--good" style="width:{{ (s.count / d.strength_max * 100) | round | int }}%"></span></span>
+        <span class="sbar-val">{{ s.count }}</span>
+        <span role="tooltip" class="tip__bubble">Evidenced at {{ s.roles | join(', ') }}{% if s.more %} +{{ s.more }} more{% endif %}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-sm text-muted py-4">No matched skills yet - run the pipeline to populate this.</p>
+    {% endif %}
+  </div>
+
+  <div class="chart-card reveal">
+    <h2 class="section-h"><i class="hdot hdot--gap"></i>Skills costing you roles</h2>
+    <p class="chart-sub">{{ d.cap.gaps | swd | safe }}</p>
+    {% if d.gaps_top %}
+      {% for s in d.gaps_top %}
+      <div class="sbar tip" tabindex="0">
+        <span class="sbar-label">{{ s.label }}</span>
+        <span class="sbar-track"><span class="sbar-fill sbar-fill--gap" style="width:{{ (s.count / d.gap_max * 100) | round | int }}%"></span></span>
+        <span class="sbar-val">{{ s.count }}</span>
+        <span role="tooltip" class="tip__bubble">Wanted at {{ s.roles | join(', ') }}{% if s.more %} +{{ s.more }} more{% endif %} - not fully covered in your resume.</span>
+      </div>
+      {% endfor %}
+      <p class="legend-note">These niche tools recur across postings. Closing one or two unlocks roles you're otherwise a strong fit for.</p>
+    {% else %}
+      <p class="text-sm text-muted py-4">No recurring skill gaps surfaced - nice.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ── What to do next: funnel + resume readiness ─────────────────────────── #}
 <div class="grid lg:grid-cols-2 gap-5 mt-5">
   <div class="chart-card reveal">
     <h2 class="section-h">Application funnel</h2>
+    <p class="chart-sub">Fills in as you apply and log outcomes.</p>
     <div class="funnel">
       {% for st in d.funnel %}<div class="fstage"><div class="fv">{{ st.count }}</div><div class="fl">{{ st.label }}</div></div>{% endfor %}
     </div>
-    <p class="text-xs text-muted mt-3">Fills in as you apply and log outcomes.</p>
   </div>
 
   <div class="chart-card reveal">
     <h2 class="section-h">Resume readiness</h2>
+    <p class="chart-sub"><b>{{ d.ats.passes }}</b> of {{ d.ats.with_resume }} resumes pass the ATS self-check{% if d.ats.below %}; <b>{{ d.ats.below }}</b> below target{% endif %}.</p>
     {% set rtot = d.total or 1 %}
-    <div class="bar-row"><span class="blabel">Passes ATS</span><div class="bar-track"><div class="bar-fill" style="width:{{ (d.ats.passes / rtot * 100) | round | int }}%;background:rgb(var(--c-good))"></div></div><span class="bar-val">{{ d.ats.passes }}</span></div>
-    <div class="bar-row"><span class="blabel">Below target</span><div class="bar-track"><div class="bar-fill" style="width:{{ (d.ats.below / rtot * 100) | round | int }}%;background:rgb(var(--c-warn))"></div></div><span class="bar-val">{{ d.ats.below }}</span></div>
-    <div class="bar-row"><span class="blabel">No resume yet</span><div class="bar-track"><div class="bar-fill" style="width:{{ ((d.total - d.ats.with_resume) / rtot * 100) | round | int }}%;background:rgb(var(--c-muted))"></div></div><span class="bar-val">{{ d.total - d.ats.with_resume }}</span></div>
+    <div class="sbar"><span class="sbar-label">Passes ATS</span><span class="sbar-track"><span class="sbar-fill sbar-fill--good" style="width:{{ (d.ats.passes / rtot * 100) | round | int }}%"></span></span><span class="sbar-val">{{ d.ats.passes }}</span></div>
+    <div class="sbar"><span class="sbar-label">Below target</span><span class="sbar-track"><span class="sbar-fill sbar-fill--warn" style="width:{{ (d.ats.below / rtot * 100) | round | int }}%"></span></span><span class="sbar-val">{{ d.ats.below }}</span></div>
+    <div class="sbar"><span class="sbar-label">No resume yet</span><span class="sbar-track"><span class="sbar-fill sbar-fill--muted" style="width:{{ ((d.total - d.ats.with_resume) / rtot * 100) | round | int }}%"></span></span><span class="sbar-val">{{ d.total - d.ats.with_resume }}</span></div>
   </div>
 </div>
 {% endblock %}

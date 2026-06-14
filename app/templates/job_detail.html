@@ -44,7 +44,7 @@
         <h2 class="section-h mb-0">Job description</h2>
         <span class="text-xs text-muted">matched terms highlighted</span>
       </div>
-      {% if j.job_text %}<div class="jd-text">{{ j.job_text | highlight(j.matched_evidence) | safe }}</div>
+      {% if j.job_text %}<div class="jd-text" data-lenis-prevent>{{ j.job_text | highlight(j.matched_evidence) | safe }}</div>
       {% else %}<p class="text-sm text-muted">No description text on file for this role yet.</p>{% endif %}
     </section>
   </div>
