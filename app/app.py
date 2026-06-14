@@ -170,6 +170,17 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     n_groups = len(by_group)
     summary = f"Found {n_skills} skills across {n_groups} groups"
 
+    # Parse résumé into the Builder schema and cache for prefill
+    try:
+        from resume_parser import parse_resume, save_parsed
+        parsed = parse_resume(resume_text, use_llm=bool(os.environ.get("LLM_API_KEY")))
+        save_parsed(parsed, UPLOADS_DIR)
+        n_roles = len(parsed.get("experiences") or [])
+        if n_roles:
+            summary += f"; {n_roles} role{'s' if n_roles != 1 else ''} parsed"
+    except Exception:
+        pass  # parse failure must never break the skills flow
+
     con = conn()
     queries.set_resume(con, dest.name, summary)
     onb = queries.get_onboarding(con)
@@ -183,6 +194,7 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
 def onboarding_resume_delete(request: Request):
     for f in UPLOADS_DIR.glob("base_resume.*"):
         f.unlink(missing_ok=True)
+    (UPLOADS_DIR / "parsed_resume.json").unlink(missing_ok=True)
     import config as _config
     real_skills = _config.ROOT / "skills.json"
     real_skills.unlink(missing_ok=True)
@@ -370,6 +382,20 @@ def builder(request: Request):
     load_env()
     ai_enabled = bool(os.environ.get("LLM_API_KEY"))
     return templates.TemplateResponse(request, "builder.html", {"ai_enabled": ai_enabled})
+
+
+@app.get("/builder/prefill")
+def builder_prefill():
+    """Return parsed_resume.json as JSON for Builder prefill, or {} if absent."""
+    p = UPLOADS_DIR / "parsed_resume.json"
+    if not p.exists():
+        return JSONResponse({})
+    try:
+        with p.open(encoding="utf-8") as f:
+            data = json.load(f)
+        return JSONResponse(data)
+    except Exception:
+        return JSONResponse({})
 
 
 @app.post("/builder/download")

@@ -388,13 +388,7 @@
     try { localStorage.setItem(STORE_KEY, JSON.stringify(collect())); } catch(e) {}
   }
 
-  function restoreLocal() {
-    var raw;
-    try { raw = localStorage.getItem(STORE_KEY); } catch(e) {}
-    if (!raw) return false;
-    var d;
-    try { d = JSON.parse(raw); } catch(e) { return false; }
-
+  function _applyData(d) {
     if (d.name)     document.getElementById('f-name').value     = d.name;
     if (d.email)    document.getElementById('f-email').value    = d.email;
     if (d.phone)    document.getElementById('f-phone').value    = d.phone;
@@ -426,7 +420,15 @@
       if (e.year)   b.querySelector('.edu-year').value   = e.year;
       if (e.gpa)    b.querySelector('.edu-gpa').value    = e.gpa;
     });
+  }
 
+  function restoreLocal() {
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e) {}
+    if (!raw) return false;
+    var d;
+    try { d = JSON.parse(raw); } catch(e) { return false; }
+    _applyData(d);
     return true;
   }
 
@@ -525,12 +527,31 @@
   /* ── Init ───────────────────────────────────────────────────────────────── */
   var restored = restoreLocal();
   if (!restored) {
-    /* Start with one empty experience + one education row */
-    document.getElementById('exp-list').appendChild(expBlock(expIdx));
-    document.getElementById('edu-list').appendChild(eduBlock(eduIdx));
+    /* No localStorage — try server prefill from parsed résumé */
+    fetch('/builder/prefill')
+      .then(function(r) { return r.ok ? r.json() : {}; })
+      .then(function(data) {
+        var hasData = data && (data.name || data.email || (data.experiences && data.experiences.length));
+        if (hasData) {
+          _applyData(data);
+          saveLocal();
+          render();
+        } else {
+          /* Start with one empty experience + one education row */
+          document.getElementById('exp-list').appendChild(expBlock(expIdx));
+          document.getElementById('edu-list').appendChild(eduBlock(eduIdx));
+          render();
+        }
+      })
+      .catch(function() {
+        document.getElementById('exp-list').appendChild(expBlock(expIdx));
+        document.getElementById('edu-list').appendChild(eduBlock(eduIdx));
+        render();
+      });
+  } else {
+    render();
   }
   bindInputs();
-  render();
 })();
 </script>
 {% endblock %}
