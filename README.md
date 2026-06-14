@@ -101,7 +101,7 @@ The scorer is fully deterministic: no LLM, no ML, no telemetry. The only part th
 
 ```bash
 # 1. Clone and launch (creates the venv, installs everything, opens the app)
-git clone <your-fork-url> northstar && cd northstar
+git clone https://github.com/Nam-Aniket/northstar.git && cd northstar
 python3 bootstrap.py            # macOS/Linux: ./run.sh   ·   Windows: run.bat
 
 # 2. Tell Northstar who you are
