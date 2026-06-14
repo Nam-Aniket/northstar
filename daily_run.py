@@ -23,6 +23,15 @@ _NON_FATAL = {"discover", "fetch"}
 # scraped intake, not its default job_posts_enriched.csv.
 _STAGE_ARGS = {"fetch": ["--input", "job_alerts_raw.csv"]}
 
+# Human-readable progress messages shown in the in-app pulse.
+_STAGE_MSG = {
+    "discover": "Searching LinkedIn for new roles",
+    "fetch": "Fetching job descriptions",
+    "prepare": "Preparing postings",
+    "score": "Scoring how well each role fits you",
+    "generate": "Building tailored resumes",
+}
+
 
 def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
@@ -109,7 +118,7 @@ def main() -> None:
             run_status.write(
                 stage=name,
                 pct=run_status.PCT.get(name, 0),
-                message=f"Running {name}...",
+                message=_STAGE_MSG.get(name, f"Running {name}"),
             )
             ok, err = _run_stage(name)
             if not ok and name not in _NON_FATAL:

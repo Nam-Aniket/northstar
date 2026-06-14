@@ -251,11 +251,16 @@ def _to_row(job: dict, enriched: dict) -> dict:
 # Fetch loop
 # ---------------------------------------------------------------------------
 
-def fetch_all(jobs: list[dict], crawler: SuperpoweredCrawlerFinal) -> list[dict]:
+def fetch_all(jobs: list[dict], crawler: SuperpoweredCrawlerFinal, progress_cb=None) -> list[dict]:
     results = []
     total = len(jobs)
 
     for i, job in enumerate(jobs, 1):
+        if progress_cb is not None:
+            try:
+                progress_cb(i, total)
+            except Exception:
+                pass  # progress reporting must never break fetching
         url = job["LinkedIn URL"]
         label = f"{job.get('Company', '?')} — {job.get('Job Title', '?')}"
         print(f"[{i}/{total}] {label}")

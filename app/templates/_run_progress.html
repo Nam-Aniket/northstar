@@ -1,8 +1,19 @@
-<div id="run-progress" {% if st.stage not in ['done','error','idle'] %}hx-get="/run/status?watch=1" hx-target="#run-progress" hx-swap="outerHTML" hx-trigger="every 1s"{% endif %} class="run-progress run-{{ st.stage }}">
-  {% if st.stage in ['prepare','score','generate','sync'] %}
-    <div class="run-bar"><div class="run-fill" style="width:{{ st.pct }}%"></div></div>
-    <div class="run-msg"><span class="spinner"></span> {{ st.message }} · {{ st.pct }}%</div>
+<div id="run-progress"
+     {% if st.stage not in ['done','error','idle'] %}hx-get="/run/status?watch=1" hx-target="#run-progress" hx-swap="outerHTML" hx-trigger="every 5s"{% endif %}>
+  {% if st.stage in ['discover','fetch','prepare','score','generate','sync'] %}
+    <div class="run-pill" role="status" aria-live="polite">
+      <div class="run-pill__top">
+        <span class="spinner"></span>
+        <span class="run-pill__msg">{{ st.message }}</span>
+        <span class="run-pill__pct">{{ st.pct }}%</span>
+      </div>
+      <div class="run-bar"><div class="run-fill" style="width:{{ st.pct }}%"></div></div>
+    </div>
   {% elif st.stage == 'error' %}
-    <div class="run-msg run-err">Failed at <b>{{ st.error_stage }}</b>. Dashboard unchanged. <details><summary>details</summary><pre>{{ st.error_detail }}</pre></details></div>
+    <div class="run-pill run-pill--err" role="alert">
+      <div class="run-pill__top"><b>Run failed at {{ st.error_stage }}</b></div>
+      <div class="run-pill__msg--wrap">Your dashboard is unchanged.</div>
+      <details><summary>details</summary><pre>{{ st.error_detail }}</pre></details>
+    </div>
   {% endif %}
 </div>

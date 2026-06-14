@@ -223,8 +223,24 @@ def main(argv: list[str] | None = None) -> None:
                     "LinkedIn URL": row.get("job_url") or row.get("LinkedIn URL") or "",
                 })
 
+            # Stream incremental fetch progress to the in-app pulse when this
+            # runs inside a pipeline run (daily_run holds the lock).
+            progress_cb = None
             try:
-                results = mod.fetch_all(jobs, crawler)
+                import run_status
+                if run_status.is_running():
+                    _span = run_status.FETCH_PCT_END - run_status.FETCH_PCT_START
+                    def progress_cb(i, total):
+                        pct = run_status.FETCH_PCT_START + int(_span * i / max(total, 1))
+                        run_status.write(
+                            stage="fetch", pct=pct,
+                            message=f"Fetching job descriptions ({i}/{total})",
+                        )
+            except Exception:
+                progress_cb = None
+
+            try:
+                results = mod.fetch_all(jobs, crawler, progress_cb=progress_cb)
             except Exception as exc:
                 print(f"[!] fetch_all failed ({exc}); marking rows fetch_error")
                 results = [{}] * len(jobs)

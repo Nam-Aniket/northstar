@@ -628,7 +628,7 @@ def run_start(request: Request):
         **kwargs,
     )
     return templates.TemplateResponse(
-        request, "_run_progress.html", {"st": {"stage": "prepare", "pct": 0, "message": "Starting..."}}
+        request, "_run_progress.html", {"st": {"stage": "discover", "pct": 2, "message": "Starting…"}}
     )
 
 
@@ -649,8 +649,15 @@ def run_status_view(request: Request):
     stage = st.get("stage")
 
     # Run in progress -> live fragment (the template keeps polling with ?watch=1).
-    if stage in ("prepare", "score", "generate", "sync"):
-        return templates.TemplateResponse(request, "_run_progress.html", {"st": st})
+    if stage in ("discover", "fetch", "prepare", "score", "generate", "sync"):
+        if run_status.is_running():
+            return templates.TemplateResponse(request, "_run_progress.html", {"st": st})
+        # Stale in-progress stage with no live process (a crashed run): clear it so
+        # the widget never polls forever against a run that will never finish.
+        run_status.write(**_IDLE)
+        if watch:
+            return Response(status_code=200, headers={"HX-Refresh": "true"})
+        return templates.TemplateResponse(request, "_run_progress.html", {"st": _IDLE})
 
     # Failed run -> show the error; fragment carries no poll trigger so polling stops.
     if stage == "error":
@@ -669,6 +676,6 @@ def run_status_view(request: Request):
     if not watch and run_status.is_running():
         return templates.TemplateResponse(
             request, "_run_progress.html",
-            {"st": {**_IDLE, "stage": "prepare", "message": "Running…"}},
+            {"st": {**_IDLE, "stage": "discover", "pct": 2, "message": "Starting…"}},
         )
     return templates.TemplateResponse(request, "_run_progress.html", {"st": st})

@@ -231,16 +231,35 @@ mark.kw{background:rgb(var(--c-accent)/.18);color:rgb(var(--c-accent-d));padding
 
 a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[role=button]:focus-visible,summary:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:2px;border-radius:.5rem}
 
-/* run-progress widget */
-#run-progress:empty{margin:0;padding:0}
-.run-progress{margin-bottom:14px}
-.run-progress.run-idle{display:none}
-.run-bar{height:6px;background:rgb(var(--c-line));border-radius:var(--r-pill);overflow:hidden;margin-bottom:7px}
-.run-fill{height:100%;background:rgb(var(--c-accent));border-radius:var(--r-pill);transition:width .4s var(--ease-smooth)}
-.run-msg{display:flex;align-items:center;gap:7px;font-size:13px;color:rgb(var(--c-muted))}
-.run-ok{color:rgb(var(--c-good-ink))}
-.run-err{color:rgb(var(--c-accent));flex-wrap:wrap}
-.run-err pre{font-size:11px;white-space:pre-wrap;word-break:break-all;opacity:.8;margin-top:4px;width:100%}
+/* run-progress: a floating pulse pill that fades in/out while the pipeline runs */
+#run-progress:empty{display:none}
+.run-pill{
+  position:fixed;right:22px;bottom:22px;z-index:80;
+  width:300px;max-width:calc(100vw - 44px);
+  background:rgb(var(--c-paper));border:1px solid rgb(var(--c-line));
+  border-radius:18px;padding:13px 15px;box-shadow:var(--shadow-glow);
+  animation:runPulse 5s var(--ease-smooth) both;
+}
+.run-pill__top{display:flex;align-items:center;gap:9px;font-size:13.5px;color:rgb(var(--c-ink))}
+.run-pill__msg{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run-pill__pct{font-variant-numeric:tabular-nums;font-weight:700;color:rgb(var(--c-accent))}
+.run-pill .run-bar{height:6px;background:rgb(var(--c-line));border-radius:var(--r-pill);overflow:hidden;margin-top:10px}
+.run-pill .run-fill{height:100%;background:rgb(var(--c-accent));border-radius:var(--r-pill);transition:width .5s var(--ease-smooth)}
+.run-pill--err{animation:none;opacity:1;border-color:rgb(var(--c-accent))}
+.run-pill--err .run-pill__top{color:rgb(var(--c-accent))}
+.run-pill__msg--wrap{font-size:12.5px;color:rgb(var(--c-muted));margin-top:4px}
+.run-pill--err details{font-size:12px;color:rgb(var(--c-muted));margin-top:5px}
+.run-pill--err pre{font-size:11px;white-space:pre-wrap;word-break:break-all;opacity:.8;margin-top:5px}
+@keyframes runPulse{
+  0%   {opacity:0;transform:translateY(14px) scale(.96)}
+  10%  {opacity:1;transform:translateY(0) scale(1)}
+  72%  {opacity:1;transform:translateY(0) scale(1)}
+  90%  {opacity:0;transform:translateY(14px) scale(.96)}
+  100% {opacity:0;transform:translateY(14px) scale(.96)}
+}
+@media (prefers-reduced-motion: reduce){
+  .run-pill{animation:none;opacity:1;transform:none}
+}
 
 /* ── Ramos custom cursor (pointer:fine only; JS sets body{cursor:none}) ─────── */
 .ns-cursor-dot{position:fixed;top:0;left:0;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;pointer-events:none;z-index:9999;background:rgb(var(--c-accent));will-change:transform;transition:width .2s var(--ease-bounce),height .2s var(--ease-bounce),margin .2s var(--ease-bounce),background-color .2s ease}

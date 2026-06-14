@@ -9,13 +9,22 @@ ROOT = Path(__file__).parent
 STATUS_PATH = ROOT / "app" / "run_status.json"
 LOCK_PATH = ROOT / "app" / "run.lock"
 
+# Baseline percentage when each stage STARTS. discover + fetch run first now;
+# fetch is the long one (JD backfill) and advances incrementally between
+# FETCH_PCT_START and FETCH_PCT_END as each JD comes in.
 PCT: dict[str, int] = {
-    "prepare": 10,
-    "score": 40,
-    "generate": 70,
-    "sync": 92,
+    "discover": 4,
+    "fetch": 12,
+    "prepare": 60,
+    "score": 72,
+    "generate": 84,
+    "sync": 94,
     "done": 100,
 }
+
+# The fetch stage interpolates across this band as jobs are processed.
+FETCH_PCT_START = 12
+FETCH_PCT_END = 58
 
 _DEFAULTS: dict = {
     "stage": "idle",
