@@ -92,21 +92,26 @@
     <div class="panel overflow-hidden">
       {# Toolbar #}
       <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:rgb(var(--c-line))">
-        <span class="text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Preview</span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Preview</span>
+          <span id="page-count-badge" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;line-height:1.6"></span>
+        </div>
         <button type="button" id="download-btn" class="btn-apply">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download .docx
         </button>
       </div>
-      {# Paper #}
-      <div style="background:rgb(var(--c-bg));padding:12px;max-height:78vh;overflow-y:auto">
-        <div id="preview-paper"
-          style="background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:10.5pt;
-                 line-height:1.45;padding:2cm;max-width:21cm;margin:0 auto;box-shadow:0 2px 20px rgba(0,0,0,.18);
-                 min-height:29.7cm">
-          <p style="color:#999;font-size:12px;text-align:center;margin-top:40px">
-            Start filling in the form to see your resume here.
-          </p>
+      {# Paper scroll container #}
+      <div id="paper-scroll" data-lenis-prevent style="background:rgb(var(--c-sand));padding:16px;max-height:80vh;overflow:auto">
+        <div id="paper-scaler" style="transform-origin:top center;margin:0 auto">
+          <div id="preview-paper"
+            style="position:relative;background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:10.5pt;
+                   line-height:1.45;padding:76px;width:794px;min-height:1122px;box-sizing:border-box;
+                   box-shadow:0 2px 20px rgba(0,0,0,.18)">
+            <p style="color:#999;font-size:12px;text-align:center;margin-top:40px">
+              Start filling in the form to see your resume here.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -281,7 +286,85 @@
     }
 
     document.getElementById('preview-paper').innerHTML = html.join('');
+    layoutPaper();
   }
+
+  /* ── Layout pass: scale paper to fit pane + page-break markers ─────────── */
+  var A4_H = 1122; /* px at 96dpi = 29.7cm */
+  var A4_W = 794;  /* px at 96dpi = 21cm   */
+
+  function layoutPaper() {
+    var scroll  = document.getElementById('paper-scroll');
+    var scaler  = document.getElementById('paper-scaler');
+    var paper   = document.getElementById('preview-paper');
+    if (!scroll || !scaler || !paper) return;
+
+    /* 1. Scale to fit available width (never upscale) */
+    var available = scroll.clientWidth - 32; /* 16px padding each side */
+    var S = Math.min(1, available / A4_W);
+    scaler.style.transform = 'scale(' + S + ')';
+    /* Collapse the scaler's layout height to match visual height so scroll
+       area doesn't have dead space below the scaled page */
+    scaler.style.height = Math.round(paper.offsetHeight * S) + 'px';
+    scaler.style.width  = A4_W + 'px';
+
+    /* 2. Remove existing page-break markers */
+    var old = paper.querySelectorAll('.pagebreak');
+    for (var i = 0; i < old.length; i++) { old[i].remove(); }
+
+    /* 3. Draw new markers */
+    var pages = Math.ceil(paper.offsetHeight / A4_H);
+    for (var k = 1; k < pages; k++) {
+      var marker = document.createElement('div');
+      marker.className = 'pagebreak';
+      marker.style.cssText = [
+        'position:absolute',
+        'left:0',
+        'right:0',
+        'top:' + (k * A4_H) + 'px',
+        'border-top:2px dashed #cbd5e1',
+        'pointer-events:none',
+        'z-index:10',
+      ].join(';');
+      var label = document.createElement('span');
+      label.style.cssText = [
+        'position:absolute',
+        'right:6px',
+        'top:3px',
+        'font-size:9px',
+        'font-family:Arial,sans-serif',
+        'color:#94a3b8',
+        'background:#fff',
+        'padding:0 4px',
+        'border-radius:3px',
+      ].join(';');
+      label.textContent = 'Page ' + (k + 1);
+      marker.appendChild(label);
+      paper.appendChild(marker);
+    }
+
+    /* 4. Page-count badge */
+    var badge = document.getElementById('page-count-badge');
+    if (badge) {
+      badge.style.display = 'inline-block';
+      if (pages <= 1) {
+        badge.textContent = '1 page';
+        badge.style.color      = 'rgb(var(--c-good-ink, 21 128 61))';
+        badge.style.background = 'rgb(var(--c-good-soft, 220 252 231))';
+      } else {
+        badge.textContent = pages + ' pages';
+        badge.style.color      = 'rgb(var(--c-accent-ink, 180 83 9))';
+        badge.style.background = 'rgb(var(--c-accent-soft, 254 243 199))';
+      }
+    }
+  }
+
+  /* Debounced resize listener */
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(layoutPaper, 120);
+  });
 
   /* ── LocalStorage ───────────────────────────────────────────────────────── */
   var STORE_KEY = 'ns-resume';

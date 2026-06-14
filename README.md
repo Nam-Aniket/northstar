@@ -53,8 +53,12 @@ cp config.example.json config.json      # target roles, location, recency, work-
 # …then edit config.json in your editor
 
 # 2. Open the app
-./run_app.sh                            # then open the printed URL
+./run_app.sh                            # macOS / Linux  (Windows: run_app.bat)
 ```
+
+> **Windows:** use `run_app.bat` instead of `run_app.sh`. Everything else is the same —
+> the pipeline is pure Python. For the optional daily auto-run, use **Task Scheduler**
+> (command shown in [Run it daily](#run-it-daily-frictionlessly)) instead of launchd.
 
 Then, in the app, click **Run** — Northstar fetches postings, scores them, and refreshes
 the board for you. That's the whole loop. (Prefer the terminal? `python daily_run.py`
