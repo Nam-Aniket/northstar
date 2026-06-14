@@ -51,6 +51,12 @@ MATCHED = ROOT / "matched_jobs.csv"
 KEEP_THRESHOLD = 45
 STRONG_THRESHOLD = 68
 
+# Laplace smoothing on the coverage denominator. A JD that surfaces only a few
+# requirements gives an unreliable 100% (e.g. 3 soft skills -> perfect fit). Adding
+# SMOOTH pseudo-requirements dampens thin-JD inflation while leaving evidence-rich
+# matches near the top.
+SMOOTH = 2
+
 _CITIZENSHIP_REQUIRED = re.compile(
     r"\b(australian citizen|citizenship|security clearance|agsva|baseline clearance|"
     r"nv1|nv2|must be a citizen|permanent resident only|pr or citizen)\b",
@@ -124,7 +130,7 @@ def score_job(role: str, jd: str) -> dict:
         fit = 12.0
         confidence = "low"
     else:
-        fit = 100.0 * supported_w / total_w
+        fit = 100.0 * supported_w / (total_w + SMOOTH)
         confidence = "ok" if (req_start is not None and total_w >= 4) else "low"
 
     caps = []

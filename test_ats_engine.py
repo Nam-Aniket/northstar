@@ -19,7 +19,7 @@ from generate_accepted_resumes import (
     summary_for,
     validate_fact_bank,
 )
-from score_jobs import score_job, KEEP_THRESHOLD
+from score_jobs import score_job, KEEP_THRESHOLD, STRONG_THRESHOLD
 
 
 def _use_caps_config():
@@ -171,10 +171,22 @@ class TestAdversarialScorer(unittest.TestCase):
                         f"unsupported-only JD scored {r['fit']} — expected < {KEEP_THRESHOLD}")
 
     def test_supported_stack_scores_high(self):
-        """JD with core supported skills (SQL, Python, Power BI) must score >= 70."""
-        jd = "Requirements: strong SQL, Python and Power BI experience."
+        """A realistic JD whose core requirements I fully match must score >= 70."""
+        jd = (
+            "Requirements: We are seeking a Data Analyst with strong SQL and Python skills "
+            "to build dashboards and reports in Power BI. You will partner with stakeholders "
+            "to deliver data-driven insights, perform ad hoc analysis, and maintain data quality."
+        )
         r = score_job("Data Analyst", jd)
         self.assertGreaterEqual(r["fit"], 70, f"supported-stack JD scored {r['fit']} — expected >= 70")
+
+    def test_thin_jd_not_inflated(self):
+        """Laplace smoothing: a JD with very few requirements must not reach the strong band
+        just because each requirement is matched — too little evidence to be confident."""
+        jd = "Requirements: strong SQL, Python and Power BI experience."
+        r = score_job("Data Analyst", jd)
+        self.assertLess(r["fit"], STRONG_THRESHOLD, f"thin JD scored {r['fit']} — smoothing should keep it out of the strong band")
+        self.assertGreater(r["fit"], 40, f"thin JD scored {r['fit']} — a fully-matched stack should still be a respectable fit")
 
     def test_citizenship_capped(self):
         """Citizenship/clearance requirement must hard-cap fit to <= 30."""

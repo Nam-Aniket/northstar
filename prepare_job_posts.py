@@ -782,11 +782,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Deduplicate and authenticity-flag LinkedIn/SEEK/Gmail job alert rows before scoring."
     )
-    parser.add_argument("--input", default="job_alerts_raw.csv", help="Raw alert CSV to prepare")
+    parser.add_argument("--input", default=None, help="Alert/enriched CSV to prepare (default: job_posts_enriched.csv if present, else job_alerts_raw.csv)")
     parser.add_argument("--out", default="job_posts.csv", help="Deduped CSV passed into the match scoring step")
     parser.add_argument("--review", default="job_post_intake_review.csv", help="Full duplicate/authenticity review CSV")
     parser.add_argument("--rejected", default="job_posts_rejected_authenticity.csv", help="Rejected suspicious or unusable rows")
     args = parser.parse_args(argv)
+
+    # The pipeline (run_pipeline.py / daily_run.py) invokes this with no args; prefer the
+    # JD-enriched file so fetched job descriptions aren't dropped. Raw alerts are the
+    # fallback for a first run before any JD enrichment exists.
+    if args.input is None:
+        args.input = "job_posts_enriched.csv" if Path("job_posts_enriched.csv").exists() else "job_alerts_raw.csv"
 
     summary = prepare(Path(args.input), Path(args.out), Path(args.review), Path(args.rejected))
     print(f"[*] Raw rows: {summary['raw']}")
