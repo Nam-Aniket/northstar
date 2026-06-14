@@ -19,7 +19,7 @@
         {% if j.jd_salary %}<span class="chip">{{ j.jd_salary }}</span>{% endif %}
         {% if j.job_day %}<span class="chip">Posted {{ j.job_day }}</span>{% endif %}
         {% if j.has_resume %}<span class="ats {{ 'ok' if j.self_check_passes_target else 'warn' }}">ATS {{ j.self_check_match_rate }}</span>{% endif %}
-        {% if j.low_confidence %}<span class="chip" title="Few recognised requirements — Fit is uncertain" style="color:rgb(var(--c-warn));background:rgb(var(--c-warn-soft))">~ low confidence</span>{% endif %}
+        {% if j.low_confidence %}<span class="chip" title="Few recognised requirements — Fit is uncertain" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">~ low confidence</span>{% endif %}
       </div>
     </div>
   </div>

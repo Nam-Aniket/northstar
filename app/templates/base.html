@@ -7,9 +7,10 @@
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('ns-theme')||'warm'}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
   <script>
     tailwind.config = { theme: { extend: {
       colors: {
@@ -20,7 +21,7 @@
         leaf:'rgb(var(--c-good)/<alpha-value>)', leafsoft:'rgb(var(--c-good-soft)/<alpha-value>)',
         gold:'rgb(var(--c-warn)/<alpha-value>)', goldsoft:'rgb(var(--c-warn-soft)/<alpha-value>)',
       },
-      fontFamily: { sans:['Inter','ui-sans-serif','system-ui'], display:['Fraunces','Georgia','serif'] },
+      fontFamily: { sans:['Urbanist','Helvetica Neue','Arial','sans-serif'], display:['Urbanist','Helvetica Neue','Arial','sans-serif'] },
     }}}
   </script>
   <link rel="stylesheet" href="/static/app.css">
@@ -60,6 +61,9 @@
 
   <div id="toast" class="ns-toast-wrap"></div>
 
+  <div class="ns-cursor-ring" aria-hidden="true"></div>
+  <div class="ns-cursor-dot" aria-hidden="true"></div>
+
   <script>
     var root = document.documentElement, tb = document.getElementById('themeBtn');
     if (tb) tb.addEventListener('click', function () {
@@ -73,6 +77,65 @@
       setTimeout(function () { n.classList.add('toast-out'); }, 1700);
       setTimeout(function () { n.remove(); }, 2100);
     });
+
+    /* ── Ramos motion layer ─────────────────────────────────────────────────── */
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var finePointer = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+
+    /* Lenis smooth scroll (skip when reduced-motion) */
+    if (!reduceMotion && window.Lenis) {
+      try {
+        var lenis = new Lenis({ duration: 1.1, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, smoothWheel: true });
+        function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+        requestAnimationFrame(raf);
+      } catch (e) {}
+    }
+
+    /* Custom cursor — dot tracks instantly, ring trails with lerp */
+    if (finePointer && !reduceMotion) {
+      var dot = document.querySelector('.ns-cursor-dot');
+      var ring = document.querySelector('.ns-cursor-ring');
+      if (dot && ring) {
+        document.body.style.cursor = 'none';
+        var mx = window.innerWidth / 2, my = window.innerHeight / 2;
+        var rx = mx, ry = my;
+        document.addEventListener('mousemove', function (e) {
+          mx = e.clientX; my = e.clientY;
+          dot.style.transform = 'translate(' + mx + 'px,' + my + 'px)';
+        }, { passive: true });
+        function ringRaf() {
+          rx += (mx - rx) * 0.18; ry += (my - ry) * 0.18;
+          ring.style.transform = 'translate(' + rx + 'px,' + ry + 'px)';
+          requestAnimationFrame(ringRaf);
+        }
+        requestAnimationFrame(ringRaf);
+        var hoverSel = 'a,button,[role=button],.statlink,.panel,input,select,textarea,summary';
+        document.addEventListener('mouseover', function (e) {
+          if (e.target.closest && e.target.closest(hoverSel)) ring.classList.add('is-hover');
+        });
+        document.addEventListener('mouseout', function (e) {
+          if (e.target.closest && e.target.closest(hoverSel) &&
+              !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(hoverSel))) {
+            ring.classList.remove('is-hover');
+          }
+        });
+      }
+    }
+
+    /* Reveal-on-scroll — only arm (and hide) when motion is allowed + IO exists */
+    if (!reduceMotion && 'IntersectionObserver' in window) {
+      root.classList.add('js-reveal');
+      var revObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('in'); revObs.unobserve(en.target); }
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+      function scanReveal(r) {
+        (r || document).querySelectorAll('.reveal:not(.in)').forEach(function (el) { revObs.observe(el); });
+      }
+      scanReveal(document);
+      document.body.addEventListener('htmx:afterSwap', function (e) { scanReveal(e.target); });
+    }
   </script>
   {% block scripts %}{% endblock %}
 </body>

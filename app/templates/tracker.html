@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Tracker · Northstar{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6 reveal">
   <div>
     <h1 class="page-h">Tracker</h1>
     <p class="page-sub">your applications at a glance</p>
@@ -21,7 +21,7 @@
   </div>
   <div class="kpi tip">
     <div class="l">Applied</div>
-    <div class="v text-leaf">{{ summary.applied }}</div>
+    <div class="v" style="color:rgb(var(--c-good-ink))">{{ summary.applied }}</div>
     <div class="text-xs text-muted mt-1">of {{ summary.total }}</div>
     <span class="tip__bubble">Jobs you have marked as applied.</span>
   </div>
@@ -33,7 +33,7 @@
   </div>
   <div class="kpi tip">
     <div class="l">Offers</div>
-    <div class="v" style="color:rgb(var(--c-good))">{{ summary.offers }}</div>
+    <div class="v" style="color:rgb(var(--c-good-ink))">{{ summary.offers }}</div>
     <div class="text-xs text-muted mt-1">received</div>
     <span class="tip__bubble">Roles where you have received an offer.</span>
   </div>

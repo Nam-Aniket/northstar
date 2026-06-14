@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Insights · Northstar{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6 reveal">
   <div>
     <h1 class="page-h">Insights</h1>
     <p class="page-sub">{{ d.total }} active roles · average fit {{ d.score_avg }}</p>
@@ -26,7 +26,7 @@
 </div>
 
 <div class="grid lg:grid-cols-2 gap-5">
-  <div class="chart-card">
+  <div class="chart-card reveal">
     <h2 class="section-h">Match-score distribution</h2>
     {% set maxc = (d.score_hist | map(attribute='count') | max) or 1 %}
     <div class="hist">
@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <div class="chart-card">
+  <div class="chart-card reveal">
     <h2 class="section-h">Roles by sector</h2>
     {% set maxs = (d.sectors | map(attribute='count') | max) or 1 %}
     {% for s in d.sectors %}
@@ -52,7 +52,7 @@
 </div>
 
 <div class="grid lg:grid-cols-2 gap-5 mt-5">
-  <div class="chart-card">
+  <div class="chart-card reveal">
     <h2 class="section-h">Application funnel</h2>
     <div class="funnel">
       {% for st in d.funnel %}<div class="fstage"><div class="fv">{{ st.count }}</div><div class="fl">{{ st.label }}</div></div>{% endfor %}
@@ -60,7 +60,7 @@
     <p class="text-xs text-muted mt-3">Fills in as you apply and log outcomes.</p>
   </div>
 
-  <div class="chart-card">
+  <div class="chart-card reveal">
     <h2 class="section-h">Resume readiness</h2>
     {% set rtot = d.total or 1 %}
     <div class="bar-row"><span class="blabel">Passes ATS</span><div class="bar-track"><div class="bar-fill" style="width:{{ (d.ats.passes / rtot * 100) | round | int }}%;background:rgb(var(--c-good))"></div></div><span class="bar-val">{{ d.ats.passes }}</span></div>

@@ -22,7 +22,7 @@
     </a>
     {% endif %}
     {% if p.is_manual %}
-    <button class="iconlink" title="Remove" style="color:var(--ink2)"
+    <button class="iconlink" title="Remove" style="color:rgb(var(--c-ink2))"
             hx-post="/person/{{ p.person_key|urlk }}/delete"
             hx-target="#person-{{ p.person_key|domid }}"
             hx-swap="outerHTML"
