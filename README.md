@@ -106,6 +106,8 @@ Skills, and Finance & Commercial.
 If the generator prints "consider adding to taxonomy", you can extend `taxonomy.json`
 with new labels using the same shape as the existing entries.
 
+For non-data professions, drop the open ESCO skills CSV at `esco/skills_en.csv` (CC BY 4.0) and recognition extends to all occupations — see `docs/`.
+
 ## How scoring works
 
 For each job, Northstar finds which of the posting's requirements you can evidence

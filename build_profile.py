@@ -79,10 +79,20 @@ def _load_taxonomy(taxonomy_path: Path) -> dict:
 
 
 def match_resume(text: str, taxonomy: dict) -> set[str]:
-    """Return the set of taxonomy labels whose aliases appear in text."""
-    # Import the same word-boundary pattern the scorer uses
-    from config import _alias_pattern
+    """Return the set of skill labels whose aliases appear in text.
 
+    Uses ontology.match_text (Aho-Corasick, full ontology) when available,
+    with the curated taxonomy as the bundled fallback.  Falls back to the
+    original per-label regex scan if ontology cannot be imported.
+    """
+    try:
+        from ontology import match_text as _onto_match
+        return _onto_match(text)
+    except Exception:
+        pass
+
+    # Original fallback: per-label regex scan against the curated taxonomy
+    from config import _alias_pattern
     lowered = text.lower()
     present: set[str] = set()
     for label, meta in taxonomy.items():
@@ -176,10 +186,19 @@ def _llm_match(text: str, taxonomy: dict) -> tuple[set[str], list[str]]:
 # ---------------------------------------------------------------------------
 
 def build_skills_json(present: set[str], taxonomy: dict) -> dict:
-    """Build the skills.json dict from present labels and full taxonomy."""
+    """Build the skills.json dict from present labels and full taxonomy.
+
+    Taxonomy labels are partitioned into supported/unsupported as before.
+    Labels in *present* that are NOT in the curated taxonomy (i.e. came from
+    an extended ontology like ESCO) are appended to supported_skills using
+    ontology.group_for() for their group.  unsupported_skills contains only
+    curated taxonomy labels not matched — the full ontology label universe is
+    never materialised there.
+    """
     supported: dict = {}
     unsupported: dict = {}
 
+    # Partition curated taxonomy labels
     for label in sorted(taxonomy.keys()):
         meta = taxonomy[label]
         if label in present:
@@ -192,6 +211,19 @@ def build_skills_json(present: set[str], taxonomy: dict) -> dict:
             supported[label] = entry
         else:
             unsupported[label] = meta["aliases"]
+
+    # Emit ontology-only labels (not in curated taxonomy)
+    try:
+        from ontology import group_for as _group_for
+    except Exception:
+        def _group_for(lbl: str) -> str:  # type: ignore[misc]
+            return "General"
+
+    for label in sorted(present - set(taxonomy.keys())):
+        supported[label] = {
+            "aliases": [label.lower()],
+            "group": _group_for(label),
+        }
 
     return {"supported_skills": supported, "unsupported_skills": unsupported}
 
