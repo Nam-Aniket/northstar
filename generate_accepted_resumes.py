@@ -38,10 +38,12 @@ bullets, A4 page.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import difflib
 import json
 import re
+import sys
 import zipfile
 from collections import Counter
 from datetime import date
@@ -1062,10 +1064,141 @@ def write_report(path: Path, target: Dict[str, str], job: Dict[str, str], conten
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Main helpers
 # ---------------------------------------------------------------------------
 
+_TRACKING_FIELDNAMES = [
+    "generated_date", "company", "role_title", "resume_file", "role_family",
+    "match_score", "self_check_match_rate", "hard_coverage_pct",
+    "quantified_bullets", "word_count", "jd_terms_missing_from_doc", "genuine_gaps",
+]
+
+
+def generate_one(
+    target: Dict[str, str],
+    job_posts: List[Dict[str, str]],
+    priors: Dict[str, List[str]],
+) -> "tuple[Dict, str]":
+    """Generate resume package for a single matched job.
+
+    Writes: slug_resume.docx, slug_cover_letter.docx, slug_job_description.txt,
+    slug_change_log.md, slug_match_report.json.
+
+    Returns (tracking_row dict, body_str) where body_str is used by the batch
+    uniqueness gate.  Calls sys.exit(0) cleanly if JD text is missing.
+    """
+    job = find_job_post(job_posts, target)
+    jd_text = job.get("job_text", "").strip()
+    if not jd_text:
+        raise ValueError(f"Missing JD text for {target['company']} - {target['role_title']}")
+
+    content = build_content(target, jd_text)
+    file_slug = f"{slugify(target['company'])}_{slugify(target['role_title'])}"
+    resume_path = OUT_ROOT / f"{file_slug}_resume.docx"
+
+    (OUT_ROOT / f"{file_slug}_job_description.txt").write_text(jd_text + "\n", encoding="utf-8")
+    write_resume(content, resume_path)
+    write_cover_letter_docx(content, target["company"], target["role_title"], jd_text,
+                            OUT_ROOT / f"{file_slug}_cover_letter.docx")
+
+    check = ats_self_check(resume_path, content, priors)
+    write_change_log(OUT_ROOT / f"{file_slug}_change_log.md", target, content, check)
+    write_report(OUT_ROOT / f"{file_slug}_match_report.json", target, job, content, check)
+
+    tracking_row = {
+        "generated_date": date.today().isoformat(),
+        "company": target["company"],
+        "role_title": target["role_title"],
+        "resume_file": f"{file_slug}_resume.docx",
+        "role_family": content["family"],
+        "match_score": target.get("match_score", ""),
+        "self_check_match_rate": check["match_rate"],
+        "hard_coverage_pct": check["hard_coverage_pct"],
+        "quantified_bullets": check["quantified_bullets"],
+        "word_count": check["word_count"],
+        "jd_terms_missing_from_doc": ", ".join(check["hard_terms_missing"]),
+        "genuine_gaps": ", ".join(content["unsupported"]),
+    }
+    body_str = content["summary"] + " " + " ".join(
+        b for bl in content["bullets_by_slot"].values() for b in bl
+    ) + " " + " ".join(content["skills_lines"])
+    return tracking_row, body_str
+
+
+def _upsert_tracking_row(row: Dict) -> None:
+    """Append or replace one row in ats_match_tracking.csv, keyed by resume_file."""
+    existing: List[Dict] = []
+    if TRACKING.exists():
+        with TRACKING.open(newline="", encoding="utf-8") as f:
+            existing = list(csv.DictReader(f))
+    existing = [r for r in existing if r.get("resume_file") != row["resume_file"]]
+    existing.append(row)
+    with TRACKING.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=_TRACKING_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(existing)
+
+
+def _main_single(row_key_arg: str) -> None:
+    """Entry point for --row-key: generate a resume for one job, bypassing generation_enabled."""
+    if not FACT_BANK:
+        print("FACT_BANK is empty; cannot generate. Exiting.")
+        sys.exit(0)
+    if not MATCHED.exists():
+        print(f"[--row-key] {MATCHED} not found; nothing to do.")
+        sys.exit(0)
+    if not JOBS.exists():
+        print(f"[--row-key] {JOBS} not found; nothing to do.")
+        sys.exit(0)
+
+    validate_fact_bank()
+
+    import csv_merge as _csv_merge
+    matches = read_csv(MATCHED)
+    target = next(
+        (r for r in matches if _csv_merge.row_key(r) == row_key_arg),
+        None,
+    )
+    if target is None:
+        print(f"[--row-key] Row key {row_key_arg!r} not found in {MATCHED}; nothing to do.")
+        sys.exit(0)
+
+    OUT_ROOT.mkdir(exist_ok=True)
+    job_posts = read_csv(JOBS)
+    priors = family_skill_priors(job_posts)
+
+    try:
+        tracking_row, _ = generate_one(target, job_posts, priors)
+    except ValueError as exc:
+        print(f"[--row-key] {exc}; skipping.")
+        sys.exit(0)
+    _upsert_tracking_row(tracking_row)
+
+    rate = tracking_row["self_check_match_rate"]
+    flag = "" if rate >= MATCH_RATE_TARGET else "  <-- below target"
+    print(f"Generated: {tracking_row['resume_file']} [{rate}/100]{flag}")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument(
+        "--row-key",
+        metavar="KEY",
+        default=None,
+        help="Generate a resume for a single job (bypasses generation_enabled gate).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-generate even if output files already exist (single-job mode only).",
+    )
+    args = parser.parse_args()
+
+    if args.row_key is not None:
+        _main_single(args.row_key)
+        return
+
+    # Batch path — gated by generation_enabled as before.
     if not config.generation_enabled or not FACT_BANK:
         print("Resume generation is OFF for this profile (v1 ships matching only). Enable it in config.json.")
         return
@@ -1079,43 +1212,13 @@ def main() -> None:
     bodies: Dict[str, str] = {}
 
     for target in matches:
-        job = find_job_post(job_posts, target)
-        jd_text = job.get("job_text", "").strip()
-        if not jd_text:
-            raise SystemExit(f"Missing JD text for {target['company']} - {target['role_title']}")
-
-        content = build_content(target, jd_text)
+        try:
+            tracking_row, body_str = generate_one(target, job_posts, priors)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
         file_slug = f"{slugify(target['company'])}_{slugify(target['role_title'])}"
-        resume_path = OUT_ROOT / f"{file_slug}_resume.docx"
-
-        (OUT_ROOT / f"{file_slug}_job_description.txt").write_text(jd_text + "\n", encoding="utf-8")
-        write_resume(content, resume_path)
-        write_cover_letter_docx(content, target["company"], target["role_title"], jd_text,
-                                OUT_ROOT / f"{file_slug}_cover_letter.docx")
-
-        check = ats_self_check(resume_path, content, priors)
-        write_change_log(OUT_ROOT / f"{file_slug}_change_log.md", target, content, check)
-        write_report(OUT_ROOT / f"{file_slug}_match_report.json", target, job, content, check)
-
-        body = content["summary"] + " " + " ".join(
-            b for bl in content["bullets_by_slot"].values() for b in bl
-        ) + " " + " ".join(content["skills_lines"])
-        bodies[file_slug] = body
-
-        tracking_rows.append({
-            "generated_date": date.today().isoformat(),
-            "company": target["company"],
-            "role_title": target["role_title"],
-            "resume_file": f"{file_slug}_resume.docx",
-            "role_family": content["family"],
-            "match_score": target.get("match_score", ""),
-            "self_check_match_rate": check["match_rate"],
-            "hard_coverage_pct": check["hard_coverage_pct"],
-            "quantified_bullets": check["quantified_bullets"],
-            "word_count": check["word_count"],
-            "jd_terms_missing_from_doc": ", ".join(check["hard_terms_missing"]),
-            "genuine_gaps": ", ".join(content["unsupported"]),
-        })
+        bodies[file_slug] = body_str
+        tracking_rows.append(tracking_row)
 
     # Uniqueness gate: no two resumes may share an identical tailored body.
     slugs = sorted(bodies)
@@ -1128,13 +1231,8 @@ def main() -> None:
             elif ratio > 0.97:
                 near.append((a, b, round(ratio, 3)))
 
-    fieldnames = [
-        "generated_date", "company", "role_title", "resume_file", "role_family",
-        "match_score", "self_check_match_rate", "hard_coverage_pct",
-        "quantified_bullets", "word_count", "jd_terms_missing_from_doc", "genuine_gaps",
-    ]
     with TRACKING.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=_TRACKING_FIELDNAMES)
         writer.writeheader()
         writer.writerows(tracking_rows)
 

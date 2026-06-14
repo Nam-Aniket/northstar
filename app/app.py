@@ -258,6 +258,23 @@ def cover(row_key: str):
 @app.post("/jobs/{row_key:path}/apply", response_class=HTMLResponse)
 def apply(request: Request, row_key: str, view: str = Form("card")):
     con = conn(); queries.set_applied(con, row_key); job = queries.get_job(con, row_key); con.close()
+    # Fire-and-forget: generate a tailored resume for this job in the background.
+    # Bypasses the generation_enabled gate via --row-key. Fails silently if inputs
+    # are missing (the subprocess exits cleanly via sys.exit(0)).
+    _gen_script = ROOT / "generate_accepted_resumes.py"
+    if _gen_script.exists():
+        _kwargs: dict = {}
+        if os.name == "posix":
+            _kwargs["start_new_session"] = True
+        else:
+            _kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008
+        subprocess.Popen(
+            [sys.executable, str(_gen_script), "--row-key", row_key],
+            cwd=str(ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **_kwargs,
+        )
     tpl = "_actionbar.html" if view == "detail" else "_job_card.html"
     return templates.TemplateResponse(request, tpl, {"j": job})
 
