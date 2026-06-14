@@ -32,3 +32,6 @@ __pycache__/
 .claude/
 .idea/
 .vscode/
+app/run_status.json
+app/run.lock
+app/daily_run.log

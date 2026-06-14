@@ -197,6 +197,17 @@ mark.kw{background:rgb(var(--c-accent)/.18);color:rgb(var(--c-accent-d));padding
 
 a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[role=button]:focus-visible,summary:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:2px;border-radius:.5rem}
 
+/* run-progress widget */
+#run-progress:empty{margin:0;padding:0}
+.run-progress{margin-bottom:14px}
+.run-progress.run-idle{display:none}
+.run-bar{height:6px;background:rgb(var(--c-line));border-radius:var(--r-pill);overflow:hidden;margin-bottom:7px}
+.run-fill{height:100%;background:rgb(var(--c-accent));border-radius:var(--r-pill);transition:width .4s var(--ease-smooth)}
+.run-msg{display:flex;align-items:center;gap:7px;font-size:13px;color:rgb(var(--c-muted))}
+.run-ok{color:rgb(var(--c-good-ink))}
+.run-err{color:rgb(var(--c-accent));flex-wrap:wrap}
+.run-err pre{font-size:11px;white-space:pre-wrap;word-break:break-all;opacity:.8;margin-top:4px;width:100%}
+
 /* ── Ramos custom cursor (pointer:fine only; JS sets body{cursor:none}) ─────── */
 .ns-cursor-dot,.ns-cursor-ring{position:fixed;top:0;left:0;pointer-events:none;z-index:9999;border-radius:50%;will-change:transform}
 .ns-cursor-dot{width:7px;height:7px;margin:-3.5px 0 0 -3.5px;background:rgb(var(--c-accent))}

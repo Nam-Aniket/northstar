@@ -338,3 +338,34 @@ def sync():
     # HX-Redirect makes HTMX do a full client-side navigation instead of swapping
     # the whole page into the Sync button (which produced a duplicate header).
     return Response(status_code=204, headers={"HX-Redirect": "/"})
+
+
+@app.post("/run")
+def run_start(request: Request):
+    import run_status
+    if run_status.is_running():
+        return Response(
+            status_code=409,
+            headers={"HX-Trigger": json.dumps({"toast": "Pipeline already running"})},
+        )
+    kwargs: dict = {}
+    if os.name == "posix":
+        kwargs["start_new_session"] = True
+    else:
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
+    subprocess.Popen(
+        [sys.executable, str(ROOT / "daily_run.py")],
+        cwd=str(ROOT),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        **kwargs,
+    )
+    return templates.TemplateResponse(
+        request, "_run_progress.html", {"st": {"stage": "prepare", "pct": 0, "message": "Starting..."}}
+    )
+
+
+@app.get("/run/status", response_class=HTMLResponse)
+def run_status_view(request: Request):
+    import run_status
+    return templates.TemplateResponse(request, "_run_progress.html", {"st": run_status.read()})
