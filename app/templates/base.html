@@ -95,7 +95,7 @@
       } catch (e) {}
     }
 
-    /* Custom cursor — single coral dot that stretches toward its motion.
+    /* Custom cursor - single coral dot that stretches toward its motion.
        The RAF loop runs ONLY while the pointer is moving (idle = no CPU). */
     if (finePointer && !reduceMotion) {
       var dot = document.querySelector('.ns-cursor-dot');
@@ -133,7 +133,7 @@
       }
     }
 
-    /* Reveal-on-scroll — only arm (and hide) when motion is allowed + IO exists */
+    /* Reveal-on-scroll - only arm (and hide) when motion is allowed + IO exists */
     if (!reduceMotion && 'IntersectionObserver' in window) {
       root.classList.add('js-reveal');
       var revObs = new IntersectionObserver(function (entries) {

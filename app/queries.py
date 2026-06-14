@@ -209,7 +209,7 @@ def insights(con, sector=None, day=None) -> dict:
     if day and day != "all":
         rows = [d for d in rows if d["job_day"] == day]
     buckets = [(70, 74), (75, 79), (80, 84), (85, 89), (90, 94), (95, 100)]
-    hist = [{"label": f"{lo}–{hi}", "count": sum(1 for d in rows if lo <= (d["match_score"] or 0) <= hi)}
+    hist = [{"label": f"{lo}-{hi}", "count": sum(1 for d in rows if lo <= (d["match_score"] or 0) <= hi)}
             for lo, hi in buckets]
     from collections import Counter
     sec = Counter(d.get("sector") or "other" for d in rows)
@@ -500,7 +500,7 @@ def highlight(text, evidence) -> str:
             part = part.strip()
             if len(part) >= 2:
                 terms.add(part)
-    esc = _html.escape(text)
+    esc = _html.escape(text, quote=False)
     if not terms:
         return esc.replace("\n", "<br>")
     pats = sorted((re.escape(t) for t in terms), key=len, reverse=True)

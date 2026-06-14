@@ -5,16 +5,16 @@
 <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
   <div>
     <h1 class="page-h">Resume Builder</h1>
-    <p class="page-sub">Fill in your details — the preview updates live. Download when ready.</p>
+    <p class="page-sub">Fill in your details - the preview updates live. Download when ready.</p>
   </div>
 </div>
 
-{# Hidden download form — native browser POST so the file saves directly #}
+{# Hidden download form - native browser POST so the file saves directly #}
 <form id="dl-form" method="post" action="/builder/download" style="display:none">
   <input type="hidden" name="payload" id="payload">
 </form>
 
-<div class="grid lg:grid-cols-2 gap-5 items-start">
+<div class="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-5 items-start">
 
   {# ── LEFT: form ──────────────────────────────────────────────────────────── #}
   <div class="panel p-5 flex flex-col gap-5">
@@ -50,11 +50,13 @@
     <div>
       <div class="flex items-center gap-2 mb-3">
         <h2 class="section-h" style="margin-bottom:0">Summary</h2>
+        {% if ai_enabled %}
         <button type="button" id="ai-summary" class="btn-open" style="padding:4px 10px;font-size:12px">&#10024; AI write</button>
         <span id="ai-summary-spinner" class="spinner" style="display:none;width:14px;height:14px;border-width:2px"></span>
+        {% endif %}
       </div>
       <textarea id="f-summary" class="filter-select" rows="3"
-        placeholder="2–3 sentences: who you are, what you bring, what you're targeting."></textarea>
+        placeholder="2-3 sentences: who you are, what you bring, what you're targeting."></textarea>
     </div>
 
     {# Experience #}
@@ -102,7 +104,7 @@
         </button>
       </div>
       {# Paper scroll container #}
-      <div id="paper-scroll" data-lenis-prevent style="background:rgb(var(--c-sand));padding:16px;max-height:80vh;overflow:auto">
+      <div id="paper-scroll" data-lenis-prevent style="background:rgb(var(--c-sand));padding:28px;max-height:calc(100vh - 160px);overflow-y:auto;overflow-x:hidden">
         <div id="paper-scaler" style="transform-origin:top center;margin:0 auto">
           <div id="preview-paper"
             style="position:relative;background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:10.5pt;
@@ -125,6 +127,9 @@
 (function () {
   'use strict';
 
+  /* AI features only render when the server has an LLM API key configured. */
+  var AI_ENABLED = {{ ai_enabled | tojson }};
+
   /* ── Templates ──────────────────────────────────────────────────────────── */
   function expBlock(idx) {
     var d = document.createElement('div');
@@ -141,10 +146,10 @@
         '<div><label class="filter-label">Company</label>',
           '<input class="filter-select exp-company" type="text" placeholder="Acme Corp"></div>',
         '<div class="col-span-2"><label class="filter-label">Dates</label>',
-          '<input class="filter-select exp-dates" type="text" placeholder="Jan 2022 – Present"></div>',
+          '<input class="filter-select exp-dates" type="text" placeholder="Jan 2022 - Present"></div>',
         '<div class="col-span-2"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label class="filter-label" style="margin-bottom:0">Bullet points (one per line)</label>',
-          '<button type="button" class="ai-bullets btn-open" style="padding:4px 10px;font-size:12px">&#10024; AI write</button>',
-          '<span class="ai-bullets-spinner spinner" style="display:none;width:14px;height:14px;border-width:2px"></span></div>',
+          (AI_ENABLED ? '<button type="button" class="ai-bullets btn-open" style="padding:4px 10px;font-size:12px">&#10024; AI write</button><span class="ai-bullets-spinner spinner" style="display:none;width:14px;height:14px;border-width:2px"></span>' : ''),
+          '</div>',
           '<textarea class="filter-select exp-bullets" rows="4" placeholder="Reduced report run-time by 60% via query optimisation&#10;Built self-service dashboard used by 40+ stakeholders"></textarea></div>',
       '</div>',
     ].join('');
@@ -165,13 +170,15 @@
       '<button type="button" class="remove-edu" title="Remove" style="position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;border:1px solid rgb(var(--c-line));background:rgb(var(--c-paper));color:rgb(var(--c-muted));cursor:pointer;display:grid;place-items:center">',
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
       '</button>',
-      '<div class="grid grid-cols-3 gap-3">',
+      '<div class="grid grid-cols-2 gap-3">',
         '<div class="col-span-2"><label class="filter-label">Degree / qualification</label>',
-          '<input class="filter-select edu-degree" type="text" placeholder="Bachelor of Commerce (Analytics)"></div>',
+          '<input class="filter-select edu-degree" type="text" placeholder="Bachelor of Commerce (Analytics)" style="padding-right:36px"></div>',
+        '<div class="col-span-2"><label class="filter-label">Institution</label>',
+          '<input class="filter-select edu-school" type="text" placeholder="University of Melbourne"></div>',
         '<div><label class="filter-label">Year</label>',
           '<input class="filter-select edu-year" type="text" placeholder="2021"></div>',
-        '<div class="col-span-3"><label class="filter-label">Institution</label>',
-          '<input class="filter-select edu-school" type="text" placeholder="University of Melbourne"></div>',
+        '<div><label class="filter-label">GPA / CGPA <span style="color:rgb(var(--c-muted));font-weight:400">(optional)</span></label>',
+          '<input class="filter-select edu-gpa" type="text" placeholder="e.g. GPA 3.8/4.0"></div>',
       '</div>',
     ].join('');
     d.querySelector('.remove-edu').addEventListener('click', function () {
@@ -199,6 +206,7 @@
         degree: b.querySelector('.edu-degree').value.trim(),
         school: b.querySelector('.edu-school').value.trim(),
         year:   b.querySelector('.edu-year').value.trim(),
+        gpa:    b.querySelector('.edu-gpa').value.trim(),
       });
     });
     return {
@@ -252,13 +260,13 @@
       exps.forEach(function (e) {
         var header = '';
         if (e.role) header += '<strong>' + esc(e.role) + '</strong>';
-        if (e.company) header += (e.role ? ' &mdash; ' : '') + esc(e.company);
+        if (e.company) header += (e.role ? ' - ' : '') + esc(e.company);
         if (e.dates) header += '<span style="float:right;font-size:9.5pt;color:#57534A">' + esc(e.dates) + '</span>';
         html.push('<div style="margin-bottom:3px;overflow:hidden">' + header + '</div>');
         if (e.bullets && e.bullets.length) {
-          html.push('<ul style="margin:2px 0 8px 18px;padding:0">');
+          html.push('<ul style="margin:2px 0 8px 0;padding-left:22px;list-style:disc outside">');
           e.bullets.forEach(function (b) {
-            html.push('<li style="font-size:10.5pt;margin-bottom:1px">' + esc(b) + '</li>');
+            html.push('<li style="font-size:10.5pt;margin-bottom:1px;list-style:disc">' + esc(b) + '</li>');
           });
           html.push('</ul>');
         }
@@ -276,8 +284,8 @@
     if (edus.length) {
       html.push(sectionHead('Education'));
       edus.forEach(function (e) {
-        var parts = [e.degree, e.school, e.year].filter(Boolean).map(esc);
-        html.push('<div style="font-size:10.5pt;margin-bottom:3px">' + parts.join(' &mdash; ') + '</div>');
+        var parts = [e.degree, e.school, e.year, e.gpa].filter(Boolean).map(esc);
+        html.push('<div style="font-size:10.5pt;margin-bottom:3px">' + parts.join(' - ') + '</div>');
       });
     }
 
@@ -299,14 +307,17 @@
     var paper   = document.getElementById('preview-paper');
     if (!scroll || !scaler || !paper) return;
 
-    /* 1. Scale to fit available width (never upscale) */
-    var available = scroll.clientWidth - 32; /* 16px padding each side */
+    /* 1. Scale to fit available width (never upscale). Origin top-left + a
+       layout box sized to the SCALED dimensions so `margin:0 auto` centres the
+       page with equal margins on every side - a CSS transform doesn't resize
+       the layout box, so the box must be set to the visual size explicitly. */
+    var pad = 56; /* 28px padding each side of #paper-scroll */
+    var available = scroll.clientWidth - pad;
     var S = Math.min(1, available / A4_W);
+    scaler.style.transformOrigin = 'top left';
     scaler.style.transform = 'scale(' + S + ')';
-    /* Collapse the scaler's layout height to match visual height so scroll
-       area doesn't have dead space below the scaled page */
+    scaler.style.width  = Math.round(A4_W * S) + 'px';
     scaler.style.height = Math.round(paper.offsetHeight * S) + 'px';
-    scaler.style.width  = A4_W + 'px';
 
     /* 2. Remove existing page-break markers */
     var old = paper.querySelectorAll('.pagebreak');
@@ -409,6 +420,7 @@
       if (e.degree) b.querySelector('.edu-degree').value = e.degree;
       if (e.school) b.querySelector('.edu-school').value = e.school;
       if (e.year)   b.querySelector('.edu-year').value   = e.year;
+      if (e.gpa)    b.querySelector('.edu-gpa').value    = e.gpa;
     });
 
     return true;
@@ -470,8 +482,9 @@
       });
   }
 
-  /* Summary AI button */
-  document.getElementById('ai-summary').addEventListener('click', function () {
+  /* Summary AI button (only present when AI is enabled) */
+  var aiSummaryBtn = document.getElementById('ai-summary');
+  if (aiSummaryBtn) aiSummaryBtn.addEventListener('click', function () {
     var btn = this;
     var spinner = document.getElementById('ai-summary-spinner');
     var firstRole = '';
@@ -487,7 +500,7 @@
     }, btn, spinner);
   });
 
-  /* Bullets AI buttons — event delegation on exp-list */
+  /* Bullets AI buttons - event delegation on exp-list */
   document.getElementById('exp-list').addEventListener('click', function(e) {
     var btn = e.target.closest('.ai-bullets');
     if (!btn) return;

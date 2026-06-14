@@ -16,7 +16,12 @@ from run_pipeline import SCRIPTS
 
 ROOT = Path(__file__).parent
 
-_NON_FATAL = {"fetch"}
+# Network-dependent stages: a non-zero exit is logged but never stops the run.
+_NON_FATAL = {"discover", "fetch"}
+
+# Extra CLI args per stage. The JD-backfill (fetch) must target the freshly
+# scraped intake, not its default job_posts_enriched.csv.
+_STAGE_ARGS = {"fetch": ["--input", "job_alerts_raw.csv"]}
 
 
 def _now() -> str:
@@ -25,7 +30,7 @@ def _now() -> str:
 
 def _run_stage(name: str) -> tuple[bool, str]:
     r = subprocess.run(
-        [sys.executable, str(SCRIPTS[name])],
+        [sys.executable, str(SCRIPTS[name]), *_STAGE_ARGS.get(name, [])],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -39,22 +44,25 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Run the full pipeline (prepare→score→generate→sync).")
     ap.add_argument(
         "--from", dest="from_stage",
-        choices=["prepare", "score", "generate"],
-        default="prepare",
+        choices=["discover", "fetch", "prepare", "score", "generate"],
+        default="discover",
         metavar="STAGE",
-        help="Start from this stage (default: prepare).",
+        help="Start from this stage (default: discover -- scrapes LinkedIn first).",
     )
     ap.add_argument(
         "--with-fetch", action="store_true",
-        help="Prepend the non-fatal 'fetch' stage before prepare.",
+        help="(deprecated no-op; discovery + JD fetch now run by default).",
     )
     args = ap.parse_args()
 
-    base_order = ["prepare", "score", "generate"]
+    base_order = ["discover", "fetch", "prepare", "score", "generate"]
     start_idx = base_order.index(args.from_stage)
     order = base_order[start_idx:]
-    if args.with_fetch:
-        order = ["fetch"] + order
+
+    # Fresh discovery merges into job_alerts_raw.csv; a stale job_posts_enriched.csv
+    # would shadow it at the prepare step, so drop it whenever we re-discover.
+    if "discover" in order:
+        (ROOT / "job_posts_enriched.csv").unlink(missing_ok=True)
 
     if not run_status.acquire_lock():
         print("already running")

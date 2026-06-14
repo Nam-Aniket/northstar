@@ -49,7 +49,7 @@ def build_resume_docx(data: dict) -> Document:
         name, email, phone, location, linkedin, summary,
         skills (comma-separated str),
         experiences: [{role, company, dates, bullets: [str, ...]}],
-        education:   [{degree, school, year}]
+        education:   [{degree, school, year, gpa}]
     """
     doc = Document()
 
@@ -124,7 +124,7 @@ def build_resume_docx(data: dict) -> Document:
                 _set_font(r, 10.5, bold=True)
 
             if company:
-                sep = " — " if role else ""
+                sep = " - " if role else ""
                 r = p.add_run(sep + company)
                 _set_font(r, 10.5)
 
@@ -156,11 +156,12 @@ def build_resume_docx(data: dict) -> Document:
             degree = (edu.get("degree") or "").strip()
             school = (edu.get("school") or "").strip()
             year = (edu.get("year") or "").strip()
-            parts = [p for p in [degree, school, year] if p]
+            gpa = (edu.get("gpa") or "").strip()
+            parts = [p for p in [degree, school, year, gpa] if p]
             if parts:
                 p = doc.add_paragraph()
                 p.paragraph_format.space_after = Pt(2)
-                r = p.add_run(" — ".join(parts))
+                r = p.add_run(" - ".join(parts))
                 _set_font(r, 10.5)
 
     return doc

@@ -164,7 +164,7 @@ def _band(fit: int) -> str:
 
 def _why_keep(r: dict, family: str) -> str:
     skills = ", ".join(r["supported"][:3]) if r["supported"] else "no evidenced must-haves"
-    msg = f"{r['band']} fit {r['fit']}% — {family.replace('_', ' ')}; evidences {skills}"
+    msg = f"{r['band']} fit {r['fit']}% - {family.replace('_', ' ')}; evidences {skills}"
     if r["lacked"]:
         msg += f"; missing {', '.join(r['lacked'][:3])}"
     if r["caps"]:

@@ -83,7 +83,7 @@ single command and a single button:
 Your application state — what you've applied to, starred, or noted, and any contacts you
 added by hand — is kept in a separate database zone and **survives every run**.
 
-### Configure two files
+### Configure your files
 
 - **`skills.json`** — `supported_skills` (everything you can genuinely claim) and
   `unsupported_skills` (tools you don't have). These drive your Fit %. Each entry lists
@@ -93,6 +93,14 @@ added by hand — is kept in a separate database zone and **survives every run**
 - **`config.json`** — your identity line, `target_keywords` (roles to search),
   `target_location`, `recency_tpr` (`r86400` = 24h), and matching options
   (`needs_sponsorship`, `seniority_cap`, `keep_threshold`).
+
+- **`facts.json`** *(optional, only for tailored résumé generation)* — your real
+  experience: `FACT_BANK` (truthful bullet variants tagged with the skills they
+  evidence), `EXPERIENCE_SLOTS` (job headers) and `BULLET_BUDGETS`. Copy
+  `facts.example.json` to `facts.json`, fill in your roles, then set
+  `generation_enabled: true` in `config.json`. When absent, the generator falls back
+  to the generic example and résumé generation stays off. Like `skills.json` and
+  `config.json`, it is gitignored, so your real content is never committed.
 
 ### Building your skill profile
 

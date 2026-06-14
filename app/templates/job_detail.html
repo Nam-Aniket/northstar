@@ -8,7 +8,7 @@
 
 <div class="panel p-5 mb-5">
   <div class="flex items-start gap-4">
-    <span class="tip">{{ ui.gauge(j.match_score, j.score_tone, 'Fit') }}<span role="tooltip" class="tip__bubble">Fit {{ j.match_score }}% — how well your skills cover this job's requirements.</span></span>
+    <span class="tip">{{ ui.gauge(j.match_score, j.score_tone, 'Fit') }}<span role="tooltip" class="tip__bubble">Fit {{ j.match_score }}% - how well your skills cover this job's requirements.</span></span>
     <div class="min-w-0 flex-1">
       <h1 class="font-display text-2xl leading-tight">{{ j.role_title }}</h1>
       <a href="/company/{{ j.company|normco|urlk }}" class="text-ink2 mt-0.5 hover:text-clay transition-colors no-underline block">{{ j.company }}</a>
@@ -19,7 +19,7 @@
         {% if j.jd_salary %}<span class="chip">{{ j.jd_salary }}</span>{% endif %}
         {% if j.job_day %}<span class="chip">Posted {{ j.job_day }}</span>{% endif %}
         {% if j.has_resume %}<span class="ats {{ 'ok' if j.self_check_passes_target else 'warn' }}">ATS {{ j.self_check_match_rate }}</span>{% endif %}
-        {% if j.low_confidence %}<span class="chip" title="Few recognised requirements — Fit is uncertain" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">~ low confidence</span>{% endif %}
+        {% if j.low_confidence %}<span class="chip" title="Few recognised requirements - Fit is uncertain" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">~ low confidence</span>{% endif %}
       </div>
     </div>
   </div>
@@ -90,7 +90,7 @@
   {% if company and company.people %}
     {% for p in company.people %}{% include "_person_row.html" %}{% endfor %}
   {% else %}
-    <p class="text-sm text-muted">No contacts tracked for {{ j.company }} yet — add people via the outreach pipeline and they'll appear here.</p>
+    <p class="text-sm text-muted">No contacts tracked for {{ j.company }} yet - add people via the outreach pipeline and they'll appear here.</p>
   {% endif %}
 </section>
 {% endblock %}

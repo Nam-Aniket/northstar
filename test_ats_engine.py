@@ -4,6 +4,7 @@
 import os
 os.environ.setdefault("JOBENGINE_SKILLS", "skills.example.json")
 os.environ.setdefault("JOBENGINE_CONFIG", "config.example.json")
+os.environ.setdefault("JOBENGINE_FACTS", "facts.example.json")
 
 import unittest
 

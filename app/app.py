@@ -1,6 +1,7 @@
 """Job-Hunt Console — local FastAPI app over the pipeline outputs."""
 from __future__ import annotations
 
+import html as _html
 import json
 import os
 import re
@@ -30,6 +31,10 @@ app = FastAPI(title="Job-Hunt Console")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 templates.env.filters["highlight"] = queries.highlight
+# Bold the numbers in an insight caption - preattentive emphasis on the "so what".
+# quote=False keeps apostrophes literal; escaping them to &#x27; would let the
+# digit-bolding regex mangle the entity ("&#x<b>27</b>;").
+templates.env.filters["swd"] = lambda t: re.sub(r"(\d+)", r"<b>\1</b>", _html.escape(t or "", quote=False))
 templates.env.filters["urlk"] = lambda k: urllib.parse.quote(k or "", safe="")
 templates.env.filters["domid"] = lambda k: re.sub(r"[^A-Za-z0-9_-]", "-", k or "")
 templates.env.filters["normco"] = queries.normalize_company
@@ -51,12 +56,20 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
          view: str = "", day: str = ""):
     con = conn()
     days = queries.available_days(con)
-    current_day = day if day else "all"
+    # Default to the newest day so the board lands on today's batch after a Run;
+    # prior days stay selectable via the day nav and "All days".
+    current_day = day if day else (days[0] if days else "all")
     effective_day = None if (not current_day or current_day == "all") else current_day
 
     jobs = queries.get_jobs(con, q=q or None, sector=sector or None, min_score=min_score,
                             status=status or None, show_dismissed=bool(show_dismissed),
                             starred_only=bool(starred), view=view or None, day=effective_day)
+    # Auto-defaulted to the newest day but nothing visible there -> fall back to all.
+    if not day and effective_day and not jobs:
+        current_day, effective_day = "all", None
+        jobs = queries.get_jobs(con, q=q or None, sector=sector or None, min_score=min_score,
+                                status=status or None, show_dismissed=bool(show_dismissed),
+                                starred_only=bool(starred), view=view or None, day=None)
 
     # prev/next day navigation (days is descending: index 0 = newest)
     if current_day and current_day != "all" and current_day in days:
@@ -194,7 +207,10 @@ def tracker_status(request: Request, row_key: str, value: str = Form(...)):
 
 @app.get("/builder", response_class=HTMLResponse)
 def builder(request: Request):
-    return templates.TemplateResponse(request, "builder.html", {})
+    from dotenv_loader import load_env
+    load_env()
+    ai_enabled = bool(os.environ.get("LLM_API_KEY"))
+    return templates.TemplateResponse(request, "builder.html", {"ai_enabled": ai_enabled})
 
 
 @app.post("/builder/download")

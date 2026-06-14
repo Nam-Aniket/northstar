@@ -198,6 +198,15 @@ EXPERIENCE_SLOTS = [
     ("Analyst | Company C | 2020 - 2022", "role3"),
 ]
 
+# Personal override: a gitignored facts.json supplies the owner's real experience
+# (bullets + budgets + slots). Absent -> the generic example above is used, so the
+# committed repo stays PII-free and the test suite stays deterministic.
+_facts_override = config.load_facts_override()
+if _facts_override:
+    FACT_BANK = _facts_override["FACT_BANK"]
+    BULLET_BUDGETS = _facts_override["BULLET_BUDGETS"]
+    EXPERIENCE_SLOTS = [tuple(s) for s in _facts_override["EXPERIENCE_SLOTS"]]
+
 
 def select_bullets(slot: str, jd_hits: Dict[str, Dict]) -> List[Dict]:
     """Greedy weighted set-cover: pick the bullets that add the most uncovered
@@ -419,7 +428,7 @@ _BASE_SUMMARIES = {
     "engineering_bi": (
         "Data analyst and automation specialist with experience building SQL/Python "
         "pipelines, Azure Data Factory ETL workflows, Power BI reporting and data-quality controls "
-        "over high-volume operational data — from source extraction through to BI layer and "
+        "over high-volume operational data, from source extraction through to BI layer and "
         "stakeholder reporting."
     ),
     "data_scientist": (
@@ -716,7 +725,7 @@ SECTOR_HOOKS = [
     (re.compile(r"\b(bank|superannuation|financial services|insurance|wealth|fund|finance sector)\b", re.IGNORECASE),
      "Reconciling large datasets and tracing exceptions to root cause is the same discipline financial-services data work demands."),
     (re.compile(r"\b(retail|hospitality|venue|restaurant|food|beverage|e-commerce|consumer)\b", re.IGNORECASE),
-     "Demand forecasting and operational KPI reporting are central to my data analyst experience — the same questions retail and hospitality teams ask of their data."),
+     "Demand forecasting and operational KPI reporting are central to my data analyst experience, the same questions retail and hospitality teams ask of their data."),
 ]
 
 # Short evidence sentences keyed by label, for the cover letter middle.

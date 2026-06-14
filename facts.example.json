@@ -1,0 +1,188 @@
+{
+  "FACT_BANK": {
+    "role1": [
+      {
+        "text": "Built a cloud-native data pipeline ingesting and enriching high-volume public feeds for downstream reporting and analytics.",
+        "evidences": [
+          "Data Pipelines",
+          "Automation",
+          "Insights"
+        ]
+      },
+      {
+        "text": "Engineered ETL workflows that clean, normalise and enrich source data for cloud data lakes and downstream reporting.",
+        "evidences": [
+          "ETL",
+          "Data Cleaning",
+          "Data Quality",
+          "Data Pipelines",
+          "Data Warehousing"
+        ]
+      },
+      {
+        "text": "Applied NLP topic modelling and source-validation scoring to automate relevance ranking and keep evidence retention audit-ready.",
+        "evidences": [
+          "NLP",
+          "Machine Learning",
+          "Data Governance",
+          "Automation"
+        ]
+      },
+      {
+        "text": "Deployed ML classification and summarisation models that convert unstructured text into analyst-ready outputs and alerts.",
+        "evidences": [
+          "Machine Learning",
+          "Model Deployment",
+          "NLP"
+        ]
+      },
+      {
+        "text": "Architected a retrieval layer with vector embeddings and metadata filters for semantic search and reporting.",
+        "evidences": [
+          "Deep Learning",
+          "Machine Learning",
+          "NLP"
+        ]
+      },
+      {
+        "text": "Documented data flows and source-validation logic so analyst workflows stay repeatable and audit-ready.",
+        "evidences": [
+          "Documentation",
+          "Data Governance",
+          "Process Mapping"
+        ]
+      }
+    ],
+    "role2": [
+      {
+        "text": "Automated recurring SQL-based reconciliation reports with Python and Azure Data Factory, freeing analyst hours and reducing billing exceptions.",
+        "evidences": [
+          "SQL",
+          "Python",
+          "Azure Data Factory",
+          "Automation",
+          "Reconciliation",
+          "ETL"
+        ]
+      },
+      {
+        "text": "Built Power BI dashboards with custom DAX measures and Power Query layers, enabling self-service reporting for operations teams.",
+        "evidences": [
+          "Power BI",
+          "DAX",
+          "Power Query",
+          "Self-Service BI",
+          "Dashboarding",
+          "Data Visualisation"
+        ]
+      },
+      {
+        "text": "Combined interval data, external feeds and usage patterns into load-forecasting models that flagged assets at risk for operations planning.",
+        "evidences": [
+          "Forecasting",
+          "Predictive Analytics",
+          "Machine Learning",
+          "Statistical Analysis"
+        ]
+      },
+      {
+        "text": "Tracked operational KPIs in Power BI for a program delivering measurable cost savings across the client portfolio.",
+        "evidences": [
+          "Power BI",
+          "KPI Reporting",
+          "Dashboarding",
+          "Data Storytelling"
+        ]
+      },
+      {
+        "text": "Gathered reporting requirements from operations and planning teams and translated them into SQL/Python pipelines and dashboards.",
+        "evidences": [
+          "Requirements Gathering",
+          "Stakeholder Management",
+          "Process Mapping",
+          "Communication",
+          "SQL",
+          "Python"
+        ]
+      },
+      {
+        "text": "Mentored analyst trainees across Agile sprint cycles, assigning Jira tickets and running acceptance checks on SQL and Python deliverables.",
+        "evidences": [
+          "Mentoring",
+          "Agile/Scrum",
+          "Jira",
+          "Collaboration",
+          "UAT",
+          "User Stories"
+        ]
+      },
+      {
+        "text": "Presented exception trends and root-cause findings to operations and planning stakeholders, shaping monthly remediation priorities.",
+        "evidences": [
+          "Data Storytelling",
+          "Communication",
+          "Stakeholder Management",
+          "Insights",
+          "Statistical Analysis"
+        ]
+      }
+    ],
+    "role3": [
+      {
+        "text": "Validated high-volume data feeds with SQL and Python data-quality checks across hundreds of millions of records per day.",
+        "evidences": [
+          "SQL",
+          "Python",
+          "Data Quality",
+          "Data Cleaning"
+        ]
+      },
+      {
+        "text": "Reconciled discrepancies between source systems, flagging thousands of mismatched records over a six-month audit cycle.",
+        "evidences": [
+          "Reconciliation",
+          "Data Migration",
+          "Data Quality",
+          "Attention to Detail"
+        ]
+      },
+      {
+        "text": "Built Power BI dashboards on operational KPIs, cutting manual reporting time by 30%.",
+        "evidences": [
+          "Power BI",
+          "Dashboarding",
+          "KPI Reporting",
+          "Automation"
+        ]
+      },
+      {
+        "text": "Clarified metric definitions and reporting requirements with business users while documenting data-quality exceptions for correction.",
+        "evidences": [
+          "Documentation",
+          "Requirements Gathering",
+          "Stakeholder Management",
+          "Communication"
+        ]
+      }
+    ]
+  },
+  "BULLET_BUDGETS": {
+    "role1": 3,
+    "role2": 4,
+    "role3": 3
+  },
+  "EXPERIENCE_SLOTS": [
+    [
+      "Data Analytics Specialist | Company A | Remote | 2025 - Present",
+      "role1"
+    ],
+    [
+      "Data Analyst & Automation Lead | Company B | 2022 - 2024",
+      "role2"
+    ],
+    [
+      "Analyst | Company C | 2020 - 2022",
+      "role3"
+    ]
+  ]
+}

@@ -83,6 +83,27 @@ def _load_config() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Personal experience override (FACT_BANK / budgets / slots)
+# A gitignored facts.json lets the owner supply real resume content without
+# committing it. Absent -> the generator keeps its committed generic example.
+# ---------------------------------------------------------------------------
+
+def load_facts_override() -> dict | None:
+    """Return the owner's gitignored facts.json if present, else None.
+
+    Looked up via JOBENGINE_FACTS env override, then facts.json in the repo
+    root. There is deliberately no example fallback: when absent, the generator
+    keeps its committed generic FACT_BANK so the public repo stays PII-free.
+    """
+    override = os.environ.get("JOBENGINE_FACTS")
+    path = Path(override) if override else (ROOT / "facts.json")
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ---------------------------------------------------------------------------
 # TERM_BANK / UNSUPPORTED_BANK — lazy proxies
 # ---------------------------------------------------------------------------
 

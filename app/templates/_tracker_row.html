@@ -13,7 +13,7 @@
       {% endfor %}
     </select>
   </td>
-  <td>{{ r.applied_at or '—' }}</td>
+  <td>{{ r.applied_at or '-' }}</td>
   <td>
     {% if r.contacts %}
     <a href="/company/{{ r.company|normco|urlk }}" class="badge ok">{{ r.contacts }}</a>

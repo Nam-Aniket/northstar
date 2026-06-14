@@ -2,6 +2,7 @@
 .env
 skills.json
 config.json
+facts.json
 profile.yaml
 gmail_oauth_client.json
 gmail_oauth_token.json
@@ -14,6 +15,8 @@ resumes/
 company_domains.json
 outreach.db
 *.db
+*.db-wal
+*.db-shm
 *.csv
 *.docx
 
