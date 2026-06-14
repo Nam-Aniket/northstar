@@ -6,6 +6,9 @@ python-multipart>=0.0.9
 python-docx>=1.1
 curl_cffi>=0.7
 
+# PDF résumé reading (build_profile.py --resume *.pdf and upcoming upload feature)
+pypdf>=4.0
+
 # Optional — outreach stages (04_draft_emails / 05_send_outreach / 06_followup):
 # google-auth
 # google-auth-oauthlib

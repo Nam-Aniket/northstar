@@ -41,18 +41,58 @@ part that calls a model, and it is strictly opt-in.
 
 ## Quickstart
 
+### One-command path (recommended)
+
 ```bash
 git clone <your-fork-url> northstar && cd northstar
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
 
-# 1. Tell Northstar who you are and what you want
-python build_profile.py --resume path/to/your_resume.docx   # generates skills.json
+# Creates the venv, installs everything, and opens the app — one command:
+python3 bootstrap.py
+```
+
+On macOS / Linux you can also use the shell wrapper:
+
+```bash
+./run.sh
+```
+
+On Windows:
+
+```
+run.bat
+```
+
+`bootstrap.py` is idempotent — on subsequent runs it checks whether
+`requirements.txt` has changed and only re-installs when needed, then launches
+immediately. Pass `--no-launch` to set up the venv without starting the server
+(useful for CI or testing).
+
+Once the server is running, configure your profile:
+
+```bash
+# Tell Northstar who you are and what you want
+python3 build_profile.py --resume path/to/your_resume.docx   # generates skills.json
 # …then open skills.json and review the supported_skills list
 cp config.example.json config.json      # target roles, location, recency, work-rights
 # …then edit config.json in your editor
+```
 
-# 2. Open the app
+Then, in the app, click **Run** to fetch and score postings.
+
+### Manual / advanced path
+
+If you prefer to manage your own virtual environment:
+
+```bash
+git clone <your-fork-url> northstar && cd northstar
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# Tell Northstar who you are and what you want
+python build_profile.py --resume path/to/your_resume.docx
+cp config.example.json config.json
+
+# Open the app
 ./run_app.sh                            # macOS / Linux  (Windows: run_app.bat)
 ```
 
