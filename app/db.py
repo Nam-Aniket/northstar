@@ -72,6 +72,13 @@ def init_schema(con: sqlite3.Connection) -> None:
             created_at TEXT
         );
 
+        -- Zone-2: tracked locations (location cards the user wants to search)
+        CREATE TABLE IF NOT EXISTS tracked_locations (
+            name TEXT PRIMARY KEY,
+            display TEXT,
+            created_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS app_state (
             row_key       TEXT PRIMARY KEY,
             starred       INT  DEFAULT 0,

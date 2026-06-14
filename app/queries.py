@@ -553,6 +553,23 @@ def clear_resume(con) -> None:
     con.commit()
 
 
+def _migrate_legacy_location(con) -> None:
+    """Seed tracked_locations from the old singleton onboarding.location once,
+    so users onboarded before multi-location keep their saved location."""
+    have = con.execute("SELECT COUNT(*) FROM tracked_locations").fetchone()[0]
+    if have:
+        return
+    row = con.execute("SELECT location FROM onboarding WHERE id=1").fetchone()
+    loc = (row["location"] if row else "") or ""
+    loc = loc.strip()
+    if loc:
+        con.execute(
+            "INSERT OR IGNORE INTO tracked_locations(name, display, created_at) VALUES(?,?,?)",
+            (loc.lower(), loc, _now()),
+        )
+        con.commit()
+
+
 def add_positions(con, raw: str) -> None:
     """Split raw on commas, strip, dedupe, insert each. Then write config."""
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -584,7 +601,14 @@ def set_location(con, loc: str) -> None:
 
 
 def set_recency(con, tpr: str) -> None:
-    con.execute("UPDATE onboarding SET recency_tpr=?, updated_at=? WHERE id=1", (tpr, _now()))
+    now = _now()
+    # Ensure the singleton exists, else this UPDATE is a silent no-op when
+    # recency is the first setting touched on a fresh DB.
+    con.execute(
+        "INSERT OR IGNORE INTO onboarding(id, created_at, updated_at) VALUES(1,?,?)",
+        (now, now),
+    )
+    con.execute("UPDATE onboarding SET recency_tpr=?, updated_at=? WHERE id=1", (tpr, now))
     con.commit()
     write_config(con)
 
@@ -592,6 +616,37 @@ def set_recency(con, tpr: str) -> None:
 def list_positions(con) -> list[dict]:
     return [dict(r) for r in con.execute(
         "SELECT title, display FROM tracked_positions ORDER BY created_at"
+    ).fetchall()]
+
+
+def add_locations(con, raw: str) -> None:
+    """Split raw on commas, strip, dedupe, insert each tracked location, then write config."""
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    seen: set[str] = set()
+    now = _now()
+    for display in parts:
+        name = display.lower()
+        if name in seen:
+            continue
+        seen.add(name)
+        con.execute(
+            "INSERT OR IGNORE INTO tracked_locations(name, display, created_at) VALUES(?,?,?)",
+            (name, display, now),
+        )
+    con.commit()
+    write_config(con)
+
+
+def remove_location(con, name: str) -> None:
+    con.execute("DELETE FROM tracked_locations WHERE name=?", (name,))
+    con.commit()
+    write_config(con)
+
+
+def list_locations(con) -> list[dict]:
+    _migrate_legacy_location(con)
+    return [dict(r) for r in con.execute(
+        "SELECT name, display FROM tracked_locations ORDER BY created_at"
     ).fetchall()]
 
 
@@ -614,13 +669,14 @@ def write_config(con) -> None:
     keywords = [p["display"] for p in positions]
 
     onb = get_onboarding(con)
-    loc = onb.get("location") or ""
     tpr = onb.get("recency_tpr") or "r86400"
+    locations = [l["display"] for l in list_locations(con)]
 
     search = data.setdefault("search", {})
     search["target_keywords"] = keywords
-    if loc:
-        search["target_location"] = loc
+    search["target_locations"] = locations
+    if locations:
+        search["target_location"] = locations[0]
     search["recency_tpr"] = tpr
 
     tmp = str(cfg_path) + ".tmp"

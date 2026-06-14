@@ -28,9 +28,34 @@ def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+def _discover_args() -> list[str]:
+    """Build discover-stage CLI args from the user's saved onboarding settings,
+    so the LinkedIn search uses their tracked roles, locations, and recency
+    instead of 00_search's hardcoded defaults. Empty -> 00_search falls back to
+    its own defaults, so the run still works."""
+    from app import db, queries
+    con = db.connect()
+    db.init_schema(con)
+    keywords = [p["display"] for p in queries.list_positions(con)]
+    locations = [l["display"] for l in queries.list_locations(con)]
+    onb = queries.get_onboarding(con)
+    tpr = onb.get("recency_tpr") or "r86400"
+    con.close()
+    a: list[str] = []
+    if keywords:
+        a += ["--keywords", *keywords]
+    if locations:
+        a += ["--location", *locations]
+    a += ["--tpr", tpr]
+    if len(locations) > 1:
+        a += ["--max-start", "100"]  # cap pagination when searching many locations (volume control)
+    return a
+
+
 def _run_stage(name: str) -> tuple[bool, str]:
+    extra = _discover_args() if name == "discover" else _STAGE_ARGS.get(name, [])
     r = subprocess.run(
-        [sys.executable, str(SCRIPTS[name]), *_STAGE_ARGS.get(name, [])],
+        [sys.executable, str(SCRIPTS[name]), *extra],
         cwd=str(ROOT),
         capture_output=True,
         text=True,

@@ -29,19 +29,13 @@
       <!-- Step 2: Location + Recency -->
       <div class="ob-step">
         <div class="ob-step-header">
-          <span class="ob-step-num {{ 'ob-step-num--done' if onb and onb.location }}">2</span>
+          <span class="ob-step-num {{ 'ob-step-num--done' if locations }}">2</span>
           <span class="ob-step-title">Location &amp; recency</span>
         </div>
         <div class="ob-step-body flex flex-col gap-3">
           <div>
             <label class="filter-label mb-1 block">Location</label>
-            <input name="location"
-                   value="{{ onb.location if onb else '' }}"
-                   placeholder="Melbourne, Victoria, Australia"
-                   class="filter-select w-full"
-                   hx-post="/onboarding/location"
-                   hx-trigger="change"
-                   hx-swap="none">
+            {% include "_locations.html" %}
           </div>
           <div>
             <label class="filter-label mb-1 block">Search recency</label>
@@ -85,7 +79,10 @@
         <svg viewBox="0 0 24 24" class="w-5 h-5 text-leaf shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         <span class="text-sm font-semibold text-leaf">You're all set!</span>
       </div>
-      <a href="/" class="btn px-5 py-2 text-sm">Go to your Board &rarr;</a>
+      <div class="flex items-center gap-2">
+        <a href="/" class="btn-undo px-4 py-2 text-sm">Go to Board</a>
+        <button hx-post="/run" hx-target="#run-progress" hx-swap="outerHTML" hx-disabled-elt="this" class="btn px-5 py-2 text-sm">Build your board</button>
+      </div>
     </div>
     {% endif %}
   </div>

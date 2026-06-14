@@ -16,16 +16,17 @@
             class="btn-undo text-xs">
       Remove
     </button>
-    <label class="btn text-xs cursor-pointer">
-      Re-upload
-      <form hx-post="/onboarding/resume"
-            hx-encoding="multipart/form-data"
-            hx-target="#resume-zone"
-            hx-swap="outerHTML"
-            style="display:contents">
+    <a href="/onboarding/resume/download" class="btn-undo text-xs">Download</a>
+    <form hx-post="/onboarding/resume"
+          hx-encoding="multipart/form-data"
+          hx-target="#resume-zone"
+          hx-swap="outerHTML"
+          style="display:contents">
+      <label class="btn text-xs cursor-pointer">
+        Re-upload
         <input type="file" name="file" accept=".docx,.pdf" required class="sr-only"
-               onchange="this.closest('form').submit()">
-      </form>
-    </label>
+               onchange="this.form.requestSubmit()">
+      </label>
+    </form>
   </div>
 </div>

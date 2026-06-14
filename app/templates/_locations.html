@@ -1,0 +1,21 @@
+<div id="locations-list">
+  <form hx-post="/onboarding/location"
+        hx-target="#locations-list"
+        hx-swap="outerHTML"
+        class="flex gap-2 mb-3">
+    <input name="names"
+           placeholder="Melbourne, Sydney, Remote"
+           class="filter-select flex-1"
+           autocomplete="off">
+    <button type="submit" class="btn text-xs px-4">Add</button>
+  </form>
+  {% if locations %}
+  <div class="flex flex-col gap-1.5">
+    {% for l in locations %}
+      {% include "_location_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-muted">No locations added yet.</p>
+  {% endif %}
+</div>

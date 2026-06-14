@@ -121,9 +121,11 @@ def onboarding_page(request: Request):
     state = queries.onboarding_state(con)
     onb = queries.get_onboarding(con)
     positions = queries.list_positions(con)
+    locations = queries.list_locations(con)
     con.close()
     return templates.TemplateResponse(request, "onboarding.html",
-                                      {"state": state, "onb": onb, "positions": positions})
+                                      {"state": state, "onb": onb, "positions": positions,
+                                       "locations": locations})
 
 
 @app.post("/onboarding/resume", response_class=HTMLResponse)
@@ -223,6 +225,18 @@ def onboarding_resume_delete(request: Request):
                                       {"onb": onb, "positions": positions})
 
 
+@app.get("/onboarding/resume/download")
+def onboarding_resume_download():
+    matches = sorted(UPLOADS_DIR.glob("base_resume.*"))
+    if not matches:
+        return Response("Resume not found", status_code=404)
+    con = conn()
+    onb = queries.get_onboarding(con)
+    con.close()
+    name = onb.get("resume_filename") or matches[0].name
+    return FileResponse(matches[0], filename=name)
+
+
 @app.post("/onboarding/positions", response_class=HTMLResponse)
 def onboarding_add_positions(request: Request, titles: str = Form("")):
     con = conn()
@@ -252,12 +266,22 @@ def onboarding_delete_position(request: Request, title: str = Form(...)):
                                       {"positions": positions, "onb": onb})
 
 
-@app.post("/onboarding/location")
-def onboarding_location(location: str = Form("")):
+@app.post("/onboarding/location", response_class=HTMLResponse)
+def onboarding_add_locations(request: Request, names: str = Form("")):
     con = conn()
-    queries.set_location(con, location.strip())
+    queries.add_locations(con, names)
+    locations = queries.list_locations(con)
     con.close()
-    return Response(status_code=204)
+    return templates.TemplateResponse(request, "_locations.html", {"locations": locations})
+
+
+@app.post("/onboarding/location/delete", response_class=HTMLResponse)
+def onboarding_delete_location(request: Request, name: str = Form(...)):
+    con = conn()
+    queries.remove_location(con, name)
+    locations = queries.list_locations(con)
+    con.close()
+    return templates.TemplateResponse(request, "_locations.html", {"locations": locations})
 
 
 @app.post("/onboarding/recency")

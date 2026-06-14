@@ -106,8 +106,8 @@ def search_keyword(crawler, keyword, location, tpr, max_start, empties_stop, del
 def main():
     ap = argparse.ArgumentParser(description="LinkedIn guest job search -> job_alerts_raw.csv")
     ap.add_argument("--keywords", nargs="+", default=DEFAULT_KEYWORDS)
-    ap.add_argument("--location", default="Australia",
-                    help='Location string (default "Australia" — scoring filters relevance).')
+    ap.add_argument("--location", nargs="+", default=["Australia"],
+                    help='One or more location strings (default ["Australia"] — scoring filters relevance).')
     ap.add_argument("--tpr", default="r86400",
                     help="Recency: r86400=24h, r172800=48h, r604800=7d.")
     ap.add_argument("--out", default="job_alerts_raw.csv")
@@ -123,11 +123,12 @@ def main():
     crawler = SuperpoweredCrawlerFinal(respect_robots=False, polite_delay=args.delay, rps=0.6)
 
     all_cards = []
-    for kw in args.keywords:
-        cards = search_keyword(crawler, kw, args.location, args.tpr,
-                               args.max_start, args.empties_stop, args.delay)
-        print(f"[{kw}] {len(cards)} cards")
-        all_cards += cards
+    for loc in args.location:
+        for kw in args.keywords:
+            cards = search_keyword(crawler, kw, loc, args.tpr,
+                                   args.max_start, args.empties_stop, args.delay)
+            print(f"[{loc} | {kw}] {len(cards)} cards")
+            all_cards += cards
 
     # dedupe by canonical job id (roles overlap)
     deduped = {}
