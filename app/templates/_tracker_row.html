@@ -3,15 +3,17 @@
   <td><a href="/jobs/{{ r.row_key|urlk }}">{{ r.role_title }}</a></td>
   <td><span class="fitpill {{ r.score_tone }}">{{ r.match_score }}</span></td>
   <td>
-    <select name="value" class="filter-select" style="width:auto;padding:5px 8px"
-            hx-post="/tracker/{{ r.row_key|urlk }}/status"
-            hx-target="#trow-{{ r.row_key|domid }}"
-            hx-swap="outerHTML"
-            hx-trigger="change">
-      {% for st in status_flow %}
-      <option value="{{ st }}" {{ 'selected' if r.status == st }}>{{ st.replace('_',' ')|title }}</option>
-      {% endfor %}
-    </select>
+    <span class="tstat tstat--{{ r.status }}">
+      <select name="value" class="filter-select" style="width:auto;padding:5px 8px;background:transparent;border-color:transparent"
+              hx-post="/tracker/{{ r.row_key|urlk }}/status"
+              hx-target="#trow-{{ r.row_key|domid }}"
+              hx-swap="outerHTML"
+              hx-trigger="change">
+        {% for st in status_flow %}
+        <option value="{{ st }}" {{ 'selected' if r.status == st }}>{{ st.replace('_',' ')|title }}</option>
+        {% endfor %}
+      </select>
+    </span>
   </td>
   <td>{{ r.applied_at or '-' }}</td>
   <td>

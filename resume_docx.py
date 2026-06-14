@@ -5,7 +5,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.shared import Pt, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 
 
 _NAVY = RGBColor(31, 78, 121)
@@ -157,11 +157,33 @@ def build_resume_docx(data: dict) -> Document:
             school = (edu.get("school") or "").strip()
             year = (edu.get("year") or "").strip()
             gpa = (edu.get("gpa") or "").strip()
-            parts = [p for p in [degree, school, year, gpa] if p]
-            if parts:
+            if degree or school:
                 p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(5)
                 p.paragraph_format.space_after = Pt(2)
-                r = p.add_run(" - ".join(parts))
-                _set_font(r, 10.5)
+
+                if year:
+                    p.paragraph_format.tab_stops.add_tab_stop(
+                        Cm(17.0), WD_TAB_ALIGNMENT.RIGHT
+                    )
+
+                if degree:
+                    r = p.add_run(degree)
+                    _set_font(r, 10.5, bold=True)
+
+                if school:
+                    sep = " · " if degree else ""
+                    r = p.add_run(sep + school)
+                    _set_font(r, 10.5)
+
+                if gpa:
+                    r = p.add_run(" · " + gpa)
+                    _set_font(r, 9.5)
+                    r.font.color.rgb = RGBColor(87, 83, 74)
+
+                if year:
+                    r = p.add_run("\t" + year)
+                    _set_font(r, 9.5)
+                    r.font.color.rgb = RGBColor(87, 83, 74)
 
     return doc

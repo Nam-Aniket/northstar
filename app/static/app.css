@@ -4,6 +4,8 @@
   --c-ink:13 13 13; --c-ink2:74 74 74; --c-muted:106 106 106;
   --c-accent:254 74 34; --c-accent-d:232 67 29; --c-accent-soft:255 234 228; --c-accent-ink:192 57 26;
   --c-good:72 200 132; --c-good-ink:29 122 77; --c-good-soft:227 247 236; --c-warn:255 208 38; --c-warn-soft:255 246 214;
+  --c-info:37 99 235; --c-info-soft:219 234 254;
+  --c-bad:220 38 38; --c-bad-soft:254 226 226;
   /* Ramos shadows — soft ambient + directional + signature coral glow */
   --shadow:0 0 40px 0 rgba(205,204,204,.5);
   --shadow-hi:-1rem 1.25rem 40px -1.25rem rgba(205,204,204,.5), 0 0 40px 0 rgba(205,204,204,.5);
@@ -25,6 +27,8 @@
   --c-ink:245 245 245; --c-ink2:179 179 179; --c-muted:130 130 130;
   --c-accent:254 90 54; --c-accent-d:254 74 34; --c-accent-soft:51 27 22; --c-accent-ink:254 90 54;
   --c-good:72 200 132; --c-good-ink:72 200 132; --c-good-soft:23 46 35; --c-warn:255 208 38; --c-warn-soft:51 43 14;
+  --c-info:96 165 250; --c-info-soft:23 37 84;
+  --c-bad:248 113 113; --c-bad-soft:69 10 10;
   --shadow:0 0 40px 0 rgba(0,0,0,.45);
   --shadow-hi:-1rem 1.25rem 40px -1.25rem rgba(0,0,0,.6), 0 0 40px 0 rgba(0,0,0,.45);
   --shadow-glow:0 1.25rem 36px -1rem rgba(254,74,34,.55);
@@ -205,6 +209,16 @@ mark.kw{background:rgb(var(--c-accent)/.18);color:rgb(var(--c-accent-d));padding
 .ns-toast-wrap{position:fixed;bottom:22px;right:22px;z-index:50;pointer-events:none;display:flex;flex-direction:column;gap:8px}
 .toast-chip{background:rgb(var(--c-ink));color:rgb(var(--c-bg));padding:.6rem 1.1rem;border-radius:var(--r-pill);font-size:.82rem;font-weight:600;box-shadow:var(--shadow-hi);opacity:1;transform:translateY(0);transition:opacity .35s,transform .35s}
 .toast-chip.toast-out{opacity:0;transform:translateY(8px)}
+
+/* tracker status tints */
+.tstat{display:inline-block;border-radius:var(--r-pill);padding:2px 4px;font-weight:600;line-height:1}
+.tstat--applied{color:rgb(var(--c-good-ink));background:rgb(var(--c-good-soft))}
+.tstat--offer{color:rgb(var(--c-good-ink));background:rgb(var(--c-good-soft))}
+.tstat--phone_screen{color:rgb(var(--c-info));background:rgb(var(--c-info-soft))}
+.tstat--interview{color:rgb(var(--c-info));background:rgb(var(--c-info-soft))}
+.tstat--rejected{color:rgb(var(--c-bad));background:rgb(var(--c-bad-soft))}
+.tstat--closed{color:rgb(var(--c-bad));background:rgb(var(--c-bad-soft))}
+.tstat--new{color:rgb(var(--c-muted));background:rgb(var(--c-sand))}
 
 /* tracker table */
 .ttable{width:100%;border-collapse:collapse;font-size:13px}

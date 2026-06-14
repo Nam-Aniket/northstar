@@ -284,8 +284,12 @@
     if (edus.length) {
       html.push(sectionHead('Education'));
       edus.forEach(function (e) {
-        var parts = [e.degree, e.school, e.year, e.gpa].filter(Boolean).map(esc);
-        html.push('<div style="font-size:10.5pt;margin-bottom:3px">' + parts.join(' - ') + '</div>');
+        var header = '';
+        if (e.degree) header += '<strong>' + esc(e.degree) + '</strong>';
+        if (e.school) header += ' · ' + esc(e.school);
+        if (e.gpa) header += ' · <span style="color:#57534A">' + esc(e.gpa) + '</span>';
+        if (e.year) header += '<span style="float:right;font-size:9.5pt;color:#57534A">' + esc(e.year) + '</span>';
+        html.push('<div style="margin-bottom:3px;overflow:hidden">' + header + '</div>');
       });
     }
 
