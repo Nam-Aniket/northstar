@@ -47,6 +47,13 @@ def conn():
     return db.connect()
 
 
+# Ensure all tables (Zone-1 + Zone-2 incl. onboarding/tracked_positions) exist on
+# startup, so a fresh install — or any DB not yet initialised — never 500s.
+_init_con = db.connect()
+db.init_schema(_init_con)
+_init_con.close()
+
+
 def _card(request, job):
     return templates.TemplateResponse(request, "_job_card.html", {"j": job})
 
