@@ -39,3 +39,4 @@ __pycache__/
 app/run_status.json
 app/run.lock
 app/daily_run.log
+scripts/derived_aliases_report.txt

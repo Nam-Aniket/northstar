@@ -532,5 +532,109 @@
   "dbt Cloud": {
     "aliases": ["dbt cloud"],
     "group": "Data Engineering"
+  },
+  "Electrical Installation": {
+    "aliases": ["electrical installation", "electrical installations", "wiring", "electrical wiring", "cable pulling", "conduit bending"],
+    "group": "Trades & Field"
+  },
+  "Fault Diagnosis": {
+    "aliases": ["fault diagnosis", "fault finding", "fault-finding", "electrical fault diagnosis"],
+    "group": "Trades & Field"
+  },
+  "Circuit Testing": {
+    "aliases": ["circuit testing", "insulation-resistance testing", "insulation resistance testing", "insulation resistance check"],
+    "group": "Trades & Field"
+  },
+  "Electrical Safety": {
+    "aliases": ["electrical safety", "isolation procedures", "lockout-tagout", "lockout tagout", "loto"],
+    "group": "Trades & Field"
+  },
+  "Preventive Maintenance": {
+    "aliases": ["preventive maintenance", "preventative maintenance", "switchboard maintenance"],
+    "group": "Trades & Field"
+  },
+  "Commissioning": {
+    "aliases": ["commissioning", "electrical commissioning", "plant commissioning"],
+    "group": "Trades & Field"
+  },
+  "Contract Drafting": {
+    "aliases": ["contract drafting", "drafting contracts", "drafting agreements"],
+    "group": "Legal"
+  },
+  "Contract Negotiation": {
+    "aliases": ["contract negotiation", "negotiating contracts", "deal negotiation"],
+    "group": "Legal"
+  },
+  "Litigation": {
+    "aliases": ["litigation", "litigation management", "dispute resolution", "pleadings", "mediation"],
+    "group": "Legal"
+  },
+  "Due Diligence": {
+    "aliases": ["due diligence", "legal due diligence", "due diligence reviews"],
+    "group": "Legal"
+  },
+  "Regulatory Compliance": {
+    "aliases": ["regulatory compliance", "compliance obligations", "compliance risk"],
+    "group": "Legal"
+  },
+  "Mergers and Acquisitions": {
+    "aliases": ["mergers and acquisitions", "m&a", "m and a", "acquisitions"],
+    "group": "Legal"
+  },
+  "Method Validation": {
+    "aliases": ["method validation", "analytical method validation", "validation protocols"],
+    "group": "Pharma & Lab"
+  },
+  "Regulatory Affairs": {
+    "aliases": ["regulatory affairs", "regulatory submissions"],
+    "group": "Pharma & Lab"
+  },
+  "Pharmacovigilance": {
+    "aliases": ["pharmacovigilance", "drug safety", "adverse event reporting"],
+    "group": "Pharma & Lab"
+  },
+  "Standard Operating Procedures": {
+    "aliases": ["standard operating procedures", "standard operating procedure", "sop", "sops"],
+    "group": "Pharma & Lab"
+  },
+  "Clinical Trials": {
+    "aliases": ["clinical trials", "clinical trial", "clinical study", "stability studies"],
+    "group": "Pharma & Lab"
+  },
+  "Medication Administration": {
+    "aliases": ["medication administration", "administer medication", "medication charts"],
+    "group": "Nursing & Clinical"
+  },
+  "Phlebotomy": {
+    "aliases": ["phlebotomy", "venipuncture", "venepuncture", "blood draw"],
+    "group": "Nursing & Clinical"
+  },
+  "IV Cannulation": {
+    "aliases": ["iv cannulation", "cannulation", "intravenous cannulation"],
+    "group": "Nursing & Clinical"
+  },
+  "Triage": {
+    "aliases": ["triage", "patient triage", "rapid assessment"],
+    "group": "Nursing & Clinical"
+  },
+  "Vital Signs Monitoring": {
+    "aliases": ["vital signs", "monitoring vital signs", "vital signs monitoring"],
+    "group": "Nursing & Clinical"
+  },
+  "Aseptic Technique": {
+    "aliases": ["aseptic technique", "sterile technique"],
+    "group": "Nursing & Clinical"
+  },
+  "Auditing": {
+    "aliases": ["auditing", "external audit", "internal audit", "audit support"],
+    "group": "Finance & Commercial"
+  },
+  "Internal Controls": {
+    "aliases": ["internal controls", "financial controls", "control framework"],
+    "group": "Finance & Commercial"
+  },
+  "Scenario Analysis": {
+    "aliases": ["scenario analysis", "scenario modelling", "scenario planning"],
+    "group": "Finance & Commercial"
   }
 }

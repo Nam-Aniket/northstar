@@ -155,7 +155,7 @@ class TestOntologyFallback(unittest.TestCase):
     def test_group_for_unknown_label(self):
         """group_for returns 'General' for labels not in taxonomy."""
         from ontology import group_for
-        self.assertEqual(group_for("Phlebotomy"), "General")
+        self.assertEqual(group_for("Beekeeping"), "General")
 
     def test_normalize_strips_accents(self):
         """normalize must strip combining accents and lowercase."""
@@ -195,7 +195,7 @@ class TestOntologyEscoMock(unittest.TestCase):
         )
         writer = _csv.writer(self._tmp)
         writer.writerow(["preferredLabel", "altLabels"])
-        writer.writerow(["phlebotomy", "venipuncture\nblood draw"])
+        writer.writerow(["beekeeping", "apiculture\nhive management"])
         writer.writerow(["nursing care", "patient care\nclinical care"])
         writer.writerow(["Python", "python programming"])  # overlaps curated
         self._tmp.close()
@@ -209,13 +209,13 @@ class TestOntologyEscoMock(unittest.TestCase):
 
     def test_esco_preferred_label_matched(self):
         from ontology import match_text
-        result = match_text("candidate has experience in phlebotomy")
-        self.assertIn("phlebotomy", result)
+        result = match_text("candidate has experience in beekeeping")
+        self.assertIn("beekeeping", result)
 
     def test_esco_alt_label_matched(self):
         from ontology import match_text
-        result = match_text("skilled in venipuncture and nursing care")
-        self.assertIn("phlebotomy", result)
+        result = match_text("skilled in apiculture and nursing care")
+        self.assertIn("beekeeping", result)
         self.assertIn("nursing care", result)
 
     def test_curated_wins_over_esco_on_python(self):
