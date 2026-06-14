@@ -1,0 +1,78 @@
+<div id="ob-steps">
+  <div class="flex flex-col gap-6">
+
+    <!-- Step 1: Resume -->
+    <div class="ob-step">
+      <div class="ob-step-header">
+        <span class="ob-step-num {{ 'ob-step-num--done' if onb and onb.skills_built }}">
+          {% if onb and onb.skills_built %}
+          <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          {% else %}1{% endif %}
+        </span>
+        <span class="ob-step-title">Resume</span>
+      </div>
+      <div class="ob-step-body">
+        {% include "_resume_zone.html" %}
+      </div>
+    </div>
+
+    <!-- Step 2: Location + Recency -->
+    <div class="ob-step">
+      <div class="ob-step-header">
+        <span class="ob-step-num {{ 'ob-step-num--done' if locations }}">2</span>
+        <span class="ob-step-title">Location &amp; recency</span>
+      </div>
+      <div class="ob-step-body flex flex-col gap-3">
+        <div>
+          <label class="filter-label mb-1 block">Location</label>
+          {% include "_locations.html" %}
+        </div>
+        <div>
+          <label class="filter-label mb-1 block">Search recency</label>
+          <select name="recency_tpr"
+                  class="filter-select w-full"
+                  hx-post="/onboarding/recency"
+                  hx-trigger="change"
+                  hx-swap="none">
+            <option value="r86400"   {{ 'selected' if not onb or (onb.recency_tpr or 'r86400') == 'r86400' }}>Past 24 hours</option>
+            <option value="r172800"  {{ 'selected' if onb and onb.recency_tpr == 'r172800' }}>Past 48 hours</option>
+            <option value="r604800"  {{ 'selected' if onb and onb.recency_tpr == 'r604800' }}>Past week</option>
+            <option value="r2592000" {{ 'selected' if onb and onb.recency_tpr == 'r2592000' }}>Past month</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Roles -->
+    <div class="ob-step {{ 'ob-step--disabled' if state == 'NEEDS_RESUME' }}">
+      <div class="ob-step-header">
+        <span class="ob-step-num {{ 'ob-step-num--done' if state == 'READY' }}">
+          {% if state == 'READY' %}
+          <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          {% else %}3{% endif %}
+        </span>
+        <span class="ob-step-title">Tracked roles</span>
+        {% if state == 'NEEDS_RESUME' %}
+        <span class="text-xs text-muted ml-2">(complete step 1 first)</span>
+        {% endif %}
+      </div>
+      <div class="ob-step-body">
+        {% include "_positions.html" %}
+      </div>
+    </div>
+
+  </div>
+
+  {% if state == 'READY' %}
+  <div class="mt-6 pt-5 border-t border-line flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 text-leaf shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="text-sm font-semibold text-leaf">You're all set!</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/" class="btn-undo px-4 py-2 text-sm">Go to Board</a>
+      <button hx-post="/run" hx-target="#run-progress" hx-swap="outerHTML" hx-disabled-elt="this" class="btn px-5 py-2 text-sm">Build your board</button>
+    </div>
+  </div>
+  {% endif %}
+</div>

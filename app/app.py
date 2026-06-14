@@ -132,9 +132,10 @@ def onboarding_page(request: Request):
 async def onboarding_resume_upload(request: Request, file: UploadFile = File(...)):
     ext = Path(file.filename).suffix.lower() if file.filename else ""
     if ext not in (".docx", ".pdf"):
-        return HTMLResponse(
-            '<div id="resume-zone" class="ob-error">Only .docx or .pdf files are accepted.</div>',
-            status_code=422,
+        return Response(
+            status_code=200,
+            headers={"HX-Reswap": "none",
+                     "HX-Trigger": json.dumps({"toast": "Only .docx or .pdf files are accepted."})},
         )
     UPLOADS_DIR.mkdir(exist_ok=True)
     # Remove any existing base_resume.* with a different extension
@@ -151,10 +152,10 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
             import pypdf  # noqa: F401
         except ImportError:
             dest.unlink(missing_ok=True)
-            return HTMLResponse(
-                '<div id="resume-zone" class="ob-error">pypdf is not installed. '
-                'Run <code>pip install pypdf</code> or upload a .docx file.</div>',
+            return Response(
                 status_code=200,
+                headers={"HX-Reswap": "none",
+                         "HX-Trigger": json.dumps({"toast": "pypdf is not installed. Run pip install pypdf or upload a .docx file."})},
             )
     taxonomy_path = _config.ROOT / "taxonomy.json"
     resume_text = extract_text(dest)
@@ -200,11 +201,14 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
 
     con = conn()
     queries.set_resume(con, dest.name, summary)
+    state = queries.onboarding_state(con)
     onb = queries.get_onboarding(con)
     positions = queries.list_positions(con)
+    locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_resume_zone.html",
-                                      {"onb": onb, "positions": positions})
+    return templates.TemplateResponse(request, "_ob_steps.html",
+                                      {"state": state, "onb": onb,
+                                       "positions": positions, "locations": locations})
 
 
 @app.post("/onboarding/resume/delete", response_class=HTMLResponse)
@@ -218,11 +222,14 @@ def onboarding_resume_delete(request: Request):
     (_config.ROOT / "facts.json").unlink(missing_ok=True)
     con = conn()
     queries.clear_resume(con)
+    state = queries.onboarding_state(con)
     onb = queries.get_onboarding(con)
     positions = queries.list_positions(con)
+    locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_resume_zone.html",
-                                      {"onb": onb, "positions": positions})
+    return templates.TemplateResponse(request, "_ob_steps.html",
+                                      {"state": state, "onb": onb,
+                                       "positions": positions, "locations": locations})
 
 
 @app.get("/onboarding/resume/download")
@@ -248,22 +255,28 @@ def onboarding_add_positions(request: Request, titles: str = Form("")):
             headers={"HX-Trigger": json.dumps({"toast": "Add a resume first"})},
         )
     queries.add_positions(con, titles)
+    state = queries.onboarding_state(con)
     positions = queries.list_positions(con)
     onb = queries.get_onboarding(con)
+    locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_positions.html",
-                                      {"positions": positions, "onb": onb})
+    return templates.TemplateResponse(request, "_ob_steps.html",
+                                      {"state": state, "onb": onb,
+                                       "positions": positions, "locations": locations})
 
 
 @app.post("/onboarding/positions/delete", response_class=HTMLResponse)
 def onboarding_delete_position(request: Request, title: str = Form(...)):
     con = conn()
     queries.remove_position(con, title)
+    state = queries.onboarding_state(con)
     positions = queries.list_positions(con)
     onb = queries.get_onboarding(con)
+    locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_positions.html",
-                                      {"positions": positions, "onb": onb})
+    return templates.TemplateResponse(request, "_ob_steps.html",
+                                      {"state": state, "onb": onb,
+                                       "positions": positions, "locations": locations})
 
 
 @app.post("/onboarding/location", response_class=HTMLResponse)

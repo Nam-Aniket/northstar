@@ -11,7 +11,7 @@
   </div>
   <div class="flex gap-2 mt-4">
     <button hx-post="/onboarding/resume/delete"
-            hx-target="#resume-zone"
+            hx-target="#ob-steps"
             hx-swap="outerHTML"
             class="btn-undo text-xs">
       Remove
@@ -19,7 +19,7 @@
     <a href="/onboarding/resume/download" class="btn-undo text-xs">Download</a>
     <form hx-post="/onboarding/resume"
           hx-encoding="multipart/form-data"
-          hx-target="#resume-zone"
+          hx-target="#ob-steps"
           hx-swap="outerHTML"
           style="display:contents">
       <label class="btn text-xs cursor-pointer">
