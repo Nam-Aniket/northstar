@@ -325,6 +325,88 @@ def set_person_status(con, person_key: str, status: str) -> None:
     con.commit()
 
 
+def tracker_rows(con) -> list[dict]:
+    """All scored jobs with application state + contact count, sorted by match_score desc."""
+    # Build contact count by normalize_company(company_key) -> count
+    contact_counts: dict[str, int] = {}
+    for r in con.execute(
+        "SELECT p.company_key, COUNT(*) AS cnt FROM people p "
+        "JOIN person_state s ON p.person_key = s.person_key "
+        "WHERE s.outreach_status IN ('contacted','followup_due','replied') "
+        "GROUP BY p.company_key"
+    ).fetchall():
+        contact_counts[normalize_company(r["company_key"])] = r["cnt"]
+
+    rows = []
+    for r in con.execute(
+        "SELECT j.row_key, j.company, j.role_title, j.job_url, j.match_score, j.sector, "
+        "       s.applied_at, s.notes, a.status AS app_status "
+        "FROM jobs j "
+        "LEFT JOIN app_state s ON j.row_key = s.row_key "
+        "LEFT JOIN application_status a ON j.row_key = a.row_key "
+        "WHERE j.match_score IS NOT NULL "
+        "ORDER BY j.match_score DESC"
+    ).fetchall():
+        d = dict(r)
+        score = d.get("match_score") or 0
+        applied = bool(d.get("applied_at"))
+        applied_at_raw = d.get("applied_at") or ""
+        d["score_tone"] = "high" if score >= 75 else ("mid" if score >= 55 else "low")
+        d["applied"] = applied
+        d["applied_at"] = applied_at_raw[:10] if applied_at_raw else ""
+        d["notes"] = d.get("notes") or ""
+        d["status"] = d.get("app_status") or ("applied" if applied else "new")
+        d["contacts"] = contact_counts.get(normalize_company(d.get("company") or ""), 0)
+        rows.append(d)
+    return rows
+
+
+def get_tracker_row(con, row_key: str) -> dict | None:
+    """Single tracker row for HTMX swap after a status update."""
+    contact_counts: dict[str, int] = {}
+    for r in con.execute(
+        "SELECT p.company_key, COUNT(*) AS cnt FROM people p "
+        "JOIN person_state s ON p.person_key = s.person_key "
+        "WHERE s.outreach_status IN ('contacted','followup_due','replied') "
+        "GROUP BY p.company_key"
+    ).fetchall():
+        contact_counts[normalize_company(r["company_key"])] = r["cnt"]
+
+    r = con.execute(
+        "SELECT j.row_key, j.company, j.role_title, j.job_url, j.match_score, j.sector, "
+        "       s.applied_at, s.notes, a.status AS app_status "
+        "FROM jobs j "
+        "LEFT JOIN app_state s ON j.row_key = s.row_key "
+        "LEFT JOIN application_status a ON j.row_key = a.row_key "
+        "WHERE j.row_key = ?",
+        (row_key,),
+    ).fetchone()
+    if not r:
+        return None
+    d = dict(r)
+    score = d.get("match_score") or 0
+    applied = bool(d.get("applied_at"))
+    applied_at_raw = d.get("applied_at") or ""
+    d["score_tone"] = "high" if score >= 75 else ("mid" if score >= 55 else "low")
+    d["applied"] = applied
+    d["applied_at"] = applied_at_raw[:10] if applied_at_raw else ""
+    d["notes"] = d.get("notes") or ""
+    d["status"] = d.get("app_status") or ("applied" if applied else "new")
+    d["contacts"] = contact_counts.get(normalize_company(d.get("company") or ""), 0)
+    return d
+
+
+def tracker_summary(con) -> dict:
+    g = lambda s, *a: con.execute(s, a).fetchone()[0]
+    total = g("SELECT COUNT(*) FROM jobs WHERE match_score IS NOT NULL")
+    applied = g("SELECT COUNT(*) FROM app_state WHERE applied_at IS NOT NULL")
+    interviewing = g(
+        "SELECT COUNT(*) FROM application_status WHERE status IN ('phone_screen','interview')"
+    )
+    offers = g("SELECT COUNT(*) FROM application_status WHERE status = 'offer'")
+    return {"total": total, "applied": applied, "interviewing": interviewing, "offers": offers}
+
+
 def highlight(text, evidence) -> str:
     """Escape JD text and wrap matched-skill terms in <mark>."""
     text = text or ""

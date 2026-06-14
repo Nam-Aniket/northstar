@@ -162,6 +162,57 @@ def people(request: Request):
     return templates.TemplateResponse(request, "people.html", ctx)
 
 
+@app.get("/tracker", response_class=HTMLResponse)
+def tracker(request: Request):
+    con = conn()
+    ctx = {
+        "rows": queries.tracker_rows(con),
+        "summary": queries.tracker_summary(con),
+    }
+    con.close()
+    return templates.TemplateResponse(request, "tracker.html", ctx)
+
+
+@app.post("/tracker/{row_key:path}/status", response_class=HTMLResponse)
+def tracker_status(request: Request, row_key: str, value: str = Form(...)):
+    con = conn()
+    if value == "applied":
+        queries.set_applied(con, row_key)
+    else:
+        queries.set_status(con, row_key, value)
+    r = queries.get_tracker_row(con, row_key)
+    con.close()
+    return templates.TemplateResponse(request, "_tracker_row.html", {"r": r})
+
+
+@app.get("/tracker/export")
+def tracker_export():
+    import csv
+    import io
+    con = conn()
+    rows = queries.tracker_rows(con)
+    con.close()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Company", "Role", "Fit %", "Status", "Applied date", "Contacts", "Job URL", "Notes"])
+    for r in rows:
+        writer.writerow([
+            r.get("company", ""),
+            r.get("role_title", ""),
+            r.get("match_score", ""),
+            r.get("status", ""),
+            r.get("applied_at", ""),
+            r.get("contacts", 0),
+            r.get("job_url", ""),
+            r.get("notes", ""),
+        ])
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=northstar_tracker.csv"},
+    )
+
+
 @app.get("/jobs/{row_key:path}", response_class=HTMLResponse)
 def detail(request: Request, row_key: str):
     con = conn(); job = queries.get_job(con, row_key)

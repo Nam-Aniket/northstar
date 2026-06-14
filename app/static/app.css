@@ -164,5 +164,14 @@ mark.kw{background:rgb(var(--c-accent)/.18);color:rgb(var(--c-accent-d));padding
 .toast-chip{background:rgb(var(--c-ink));color:rgb(var(--c-bg));padding:.6rem .95rem;border-radius:.7rem;font-size:.82rem;font-weight:500;box-shadow:var(--shadow-hi);opacity:1;transform:translateY(0);transition:opacity .35s,transform .35s}
 .toast-chip.toast-out{opacity:0;transform:translateY(8px)}
 
+/* tracker table */
+.ttable{width:100%;border-collapse:collapse;font-size:13px}
+.ttable th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:rgb(var(--c-muted));padding:8px 12px;border-bottom:1px solid rgb(var(--c-line))}
+.ttable td{padding:10px 12px;border-bottom:1px solid rgb(var(--c-line));color:rgb(var(--c-ink2));vertical-align:middle}
+.ttable tr:hover td{background:rgb(var(--c-sand))}
+.ttable a{color:rgb(var(--c-ink));text-decoration:none;font-weight:500}.ttable a:hover{color:rgb(var(--c-accent))}
+.fitpill{display:inline-flex;align-items:center;justify-content:center;min-width:34px;padding:2px 8px;border-radius:999px;font-weight:600;font-size:12px}
+.fitpill.high{color:rgb(var(--c-good));background:rgb(var(--c-good-soft))}.fitpill.mid{color:rgb(var(--c-accent));background:rgb(var(--c-accent-soft))}.fitpill.low{color:rgb(var(--c-warn));background:rgb(var(--c-warn-soft))}
+
 a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:2px;border-radius:.4rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
