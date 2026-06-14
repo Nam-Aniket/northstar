@@ -286,6 +286,52 @@ def person_status(request: Request, person_key: str, value: str = Form(...)):
     return templates.TemplateResponse(request, "_person_row.html", {"p": p})
 
 
+@app.post("/company/{company_key:path}/people", response_class=HTMLResponse)
+def add_person(request: Request, company_key: str,
+               name: str = Form(...), role: str = Form(""),
+               email: str = Form(""), linkedin_url: str = Form("")):
+    if not name.strip():
+        return HTMLResponse('<div class="text-xs text-rose-500 px-3 py-1">Name is required</div>')
+    con = conn()
+    pk = queries.add_manual_person(con, company_key, name.strip(), role.strip(), email.strip(), linkedin_url.strip())
+    p = queries.get_person(con, pk)
+    con.close()
+    return templates.TemplateResponse(request, "_person_row.html", {"p": p})
+
+
+@app.post("/company", response_class=HTMLResponse)
+def add_company(request: Request,
+                company_name: str = Form(...),
+                domain: str = Form(""),
+                name: list[str] = Form([]),
+                role: list[str] = Form([]),
+                email: list[str] = Form([]),
+                linkedin_url: list[str] = Form([])):
+    con = conn()
+    ck = queries.add_manual_company(con, company_name.strip(), domain.strip())
+    for i, nm in enumerate(name):
+        if nm.strip():
+            queries.add_manual_person(
+                con, ck, nm.strip(),
+                role[i].strip() if i < len(role) else "",
+                email[i].strip() if i < len(email) else "",
+                linkedin_url[i].strip() if i < len(linkedin_url) else "",
+            )
+    con.close()
+    return Response(status_code=204, headers={"HX-Redirect": f"/company/{urllib.parse.quote(ck, safe='')}"})
+
+
+@app.post("/person/{person_key:path}/delete", response_class=HTMLResponse)
+def delete_person(person_key: str):
+    con = conn()
+    if con.execute("SELECT 1 FROM people WHERE person_key=?", (person_key,)).fetchone():
+        con.close()
+        return HTMLResponse("", status_code=409)
+    queries.delete_manual_person(con, person_key)
+    con.close()
+    return HTMLResponse("")
+
+
 @app.post("/sync")
 def sync():
     subprocess.run([sys.executable, str(APP_DIR / "sync.py")], cwd=str(ROOT))

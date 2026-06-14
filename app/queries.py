@@ -35,6 +35,10 @@ def normalize_company(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").lower()).strip()
 
 
+def slugify(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", (s or "").lower()).strip("_")
+
+
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
@@ -225,7 +229,7 @@ def insights(con, sector=None, day=None) -> dict:
             "applied": applied, "score_avg": round(sum(scores) / len(scores), 1) if scores else 0}
 
 
-def _person_row(p, ps, drafts, outr) -> dict:
+def _person_row(p, ps, drafts, outr, is_manual: bool = False) -> dict:
     """Build a person dict from a people row, person_state row, drafts list, outreach list."""
     email = p["verified_email"] or ""
     nm = (p["name"] or "").lower()
@@ -251,11 +255,16 @@ def _person_row(p, ps, drafts, outr) -> dict:
         "replied":        replied,
         "outreach_status": outreach_status,
         "contacted_at":   contacted_at,
+        "is_manual":      is_manual,
     }
 
 
 def people(con) -> list[dict]:
     comp = {r["company_key"]: dict(r) for r in con.execute("SELECT * FROM companies")}
+    # Overlay manual_company for companies not in Zone-1
+    for r in con.execute("SELECT * FROM manual_company"):
+        ck = r["company_key"]
+        comp.setdefault(ck, {"company_key": ck, "company_name": r["company_name"], "domain": r["domain"] or ""})
     drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
     outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
     ps_map = {r["person_key"]: dict(r) for r in con.execute("SELECT * FROM person_state")}
@@ -269,6 +278,21 @@ def people(con) -> list[dict]:
             "people":      [],
         })
         g["people"].append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr))
+    # Append manual people whose key is not already present
+    seen_keys = {pp["person_key"] for g in groups.values() for pp in g["people"]}
+    for p in con.execute("SELECT * FROM manual_people"):
+        pk = p["person_key"]
+        if pk in seen_keys:
+            continue
+        ck = p["company_key"]
+        comp_info = comp.get(ck, {})
+        g = groups.setdefault(ck, {
+            "company":     (comp_info.get("company_name") or ck),
+            "company_key": ck,
+            "domain":      comp_info.get("domain", ""),
+            "people":      [],
+        })
+        g["people"].append(_person_row(p, ps_map.get(pk), drafts, outr, is_manual=True))
     out = sorted(groups.values(), key=lambda g: (-len(g["people"]), g["company"].lower()))
     for g in out:
         g["count"] = len(g["people"])
@@ -279,8 +303,20 @@ def people(con) -> list[dict]:
 
 def company_detail(con, company_key: str) -> dict:
     comp_row = con.execute("SELECT * FROM companies WHERE company_key=?", (company_key,)).fetchone()
-    company_name = (dict(comp_row)["company_name"] if comp_row else None) or company_key.title()
-    domain = dict(comp_row).get("domain", "") if comp_row else ""
+    if comp_row:
+        company_name = dict(comp_row)["company_name"] or company_key.title()
+        domain = dict(comp_row).get("domain", "") or ""
+    else:
+        # Fall back to manual_company before using the key itself
+        manual_comp = con.execute(
+            "SELECT * FROM manual_company WHERE company_key=?", (company_key,)
+        ).fetchone()
+        if manual_comp:
+            company_name = manual_comp["company_name"] or company_key.title()
+            domain = manual_comp["domain"] or ""
+        else:
+            company_name = company_key.title()
+            domain = ""
     drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
     outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
     ps_map = {r["person_key"]: dict(r) for r in con.execute("SELECT * FROM person_state")}
@@ -288,6 +324,10 @@ def company_detail(con, company_key: str) -> dict:
         _person_row(p, ps_map.get(p["person_key"]), drafts, outr)
         for p in con.execute("SELECT * FROM people WHERE company_key=?", (company_key,))
     ]
+    seen_keys = {pr["person_key"] for pr in people_rows}
+    for p in con.execute("SELECT * FROM manual_people WHERE company_key=?", (company_key,)):
+        if p["person_key"] not in seen_keys:
+            people_rows.append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr, is_manual=True))
     return {
         "company":     company_name,
         "company_key": company_key,
@@ -298,12 +338,16 @@ def company_detail(con, company_key: str) -> dict:
 
 def get_person(con, person_key: str) -> dict | None:
     p = con.execute("SELECT * FROM people WHERE person_key=?", (person_key,)).fetchone()
+    is_manual = False
     if not p:
-        return None
+        p = con.execute("SELECT * FROM manual_people WHERE person_key=?", (person_key,)).fetchone()
+        if not p:
+            return None
+        is_manual = True
     drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
     outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
     ps = con.execute("SELECT * FROM person_state WHERE person_key=?", (person_key,)).fetchone()
-    return _person_row(p, dict(ps) if ps else None, drafts, outr)
+    return _person_row(p, dict(ps) if ps else None, drafts, outr, is_manual=is_manual)
 
 
 def set_person_status(con, person_key: str, status: str) -> None:
@@ -328,12 +372,17 @@ def set_person_status(con, person_key: str, status: str) -> None:
 
 def tracker_rows(con) -> list[dict]:
     """All scored jobs with application state + contact count, sorted by match_score desc."""
-    # Build contact count by normalize_company(company_key) -> count
+    # Build contact count by normalize_company(company_key) -> count (Zone-1 + manual)
     contact_counts: dict[str, int] = {}
     for r in con.execute(
         "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
     ).fetchall():
         contact_counts[normalize_company(r["company_key"])] = r["cnt"]
+    for r in con.execute(
+        "SELECT company_key, COUNT(*) AS cnt FROM manual_people GROUP BY company_key"
+    ).fetchall():
+        nk = normalize_company(r["company_key"])
+        contact_counts[nk] = contact_counts.get(nk, 0) + r["cnt"]
 
     rows = []
     for r in con.execute(
@@ -366,6 +415,11 @@ def get_tracker_row(con, row_key: str) -> dict | None:
         "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
     ).fetchall():
         contact_counts[normalize_company(r["company_key"])] = r["cnt"]
+    for r in con.execute(
+        "SELECT company_key, COUNT(*) AS cnt FROM manual_people GROUP BY company_key"
+    ).fetchall():
+        nk = normalize_company(r["company_key"])
+        contact_counts[nk] = contact_counts.get(nk, 0) + r["cnt"]
 
     r = con.execute(
         "SELECT j.row_key, j.company, j.role_title, j.job_url, j.match_score, j.sector, "
@@ -400,6 +454,38 @@ def tracker_summary(con) -> dict:
     )
     offers = g("SELECT COUNT(*) FROM application_status WHERE status = 'offer'")
     return {"total": total, "applied": applied, "interviewing": interviewing, "offers": offers}
+
+
+def add_manual_company(con, company_name: str, domain: str = "") -> str:
+    """INSERT OR REPLACE into manual_company; return company_key."""
+    ck = normalize_company(company_name)
+    con.execute(
+        "INSERT OR REPLACE INTO manual_company(company_key, company_name, domain, created_at) VALUES(?,?,?,?)",
+        (ck, company_name, domain or "", _now()),
+    )
+    con.commit()
+    return ck
+
+
+def add_manual_person(con, company_key: str, name: str, role: str = "",
+                      email: str = "", linkedin_url: str = "") -> str:
+    """INSERT OR REPLACE into manual_people; return person_key."""
+    pk = company_key + "|" + slugify(name)
+    con.execute(
+        "INSERT OR REPLACE INTO manual_people"
+        "(person_key, company_key, name, role, verified_email, linkedin_url, created_at)"
+        " VALUES(?,?,?,?,?,?,?)",
+        (pk, company_key, name, role or "", email or "", linkedin_url or "", _now()),
+    )
+    con.commit()
+    return pk
+
+
+def delete_manual_person(con, person_key: str) -> None:
+    """Delete from manual_people AND person_state."""
+    con.execute("DELETE FROM manual_people WHERE person_key=?", (person_key,))
+    con.execute("DELETE FROM person_state WHERE person_key=?", (person_key,))
+    con.commit()
 
 
 def highlight(text, evidence) -> str:

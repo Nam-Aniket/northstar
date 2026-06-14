@@ -21,5 +21,12 @@
       <svg viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
     </a>
     {% endif %}
+    {% if p.is_manual %}
+    <button class="iconlink" title="Remove" style="color:var(--ink2)"
+            hx-post="/person/{{ p.person_key|urlk }}/delete"
+            hx-target="#person-{{ p.person_key|domid }}"
+            hx-swap="outerHTML"
+            hx-confirm="Remove {{ p.name }}?">✕</button>
+    {% endif %}
   </div>
 </div>

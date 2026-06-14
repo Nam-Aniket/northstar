@@ -55,5 +55,22 @@ def init_schema(con: sqlite3.Connection) -> None:
             notes            TEXT,
             updated_at       TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS manual_people (
+            person_key     TEXT PRIMARY KEY,
+            company_key    TEXT,
+            name           TEXT,
+            role           TEXT,
+            verified_email TEXT,
+            linkedin_url   TEXT,
+            created_at     TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS manual_company (
+            company_key  TEXT PRIMARY KEY,
+            company_name TEXT,
+            domain       TEXT,
+            created_at   TEXT
+        );
     """)
     con.commit()

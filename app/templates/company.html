@@ -10,13 +10,24 @@
   <p class="page-sub">{{ c.people|length }} contact{{ '' if c.people|length == 1 else 's' }}{% if c.domain %} · {{ c.domain }}{% endif %}</p>
 </div>
 
-{% if c.people %}
-<div class="panel">
+<div id="people-list" class="panel">
   {% for p in c.people %}
     {% include "_person_row.html" %}
   {% endfor %}
 </div>
-{% else %}
-<div class="panel p-10 text-center text-muted">No contacts tracked for this company yet.</div>
-{% endif %}
+
+<details class="mt-4" style="max-width:480px">
+  <summary class="btn cursor-pointer inline-block">+ Add person</summary>
+  <form class="mt-3 flex flex-col gap-2"
+        hx-post="/company/{{ c.company_key|urlk }}/people"
+        hx-target="#people-list"
+        hx-swap="beforeend"
+        hx-on::after-request="this.reset()">
+    <input name="name" required placeholder="Name" class="filter-select" style="width:100%">
+    <input name="role" placeholder="Role (optional)" class="filter-select" style="width:100%">
+    <input name="email" placeholder="Email (optional)" class="filter-select" style="width:100%">
+    <input name="linkedin_url" placeholder="LinkedIn URL (optional)" class="filter-select" style="width:100%">
+    <button type="submit" class="btn" style="align-self:flex-start">Add</button>
+  </form>
+</details>
 {% endblock %}
