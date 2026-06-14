@@ -235,7 +235,7 @@
     }
 
     /* Experience */
-    var exps = (d.experiences || []).filter(function(e){ return e.role || e.company; });
+    var exps = (d.experiences || []).filter(function(e){ return e.role || e.company || (e.bullets && e.bullets.length); });
     if (exps.length) {
       html.push(sectionHead('Experience'));
       exps.forEach(function (e) {

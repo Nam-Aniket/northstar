@@ -111,7 +111,7 @@ def build_resume_docx(data: dict) -> Document:
             dates = (exp.get("dates") or "").strip()
             bullets = [b.strip() for b in (exp.get("bullets") or []) if b.strip()]
 
-            if not (role or company):
+            if not (role or company or bullets):
                 continue
 
             # Role — Company · Dates on one paragraph

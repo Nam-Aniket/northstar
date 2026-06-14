@@ -198,7 +198,8 @@ def set_status(con, row_key, status, commit=True):
 
 
 def insights(con, sector=None, day=None) -> dict:
-    rows = [d for d in (_shape(r) for r in con.execute(JOB_SELECT).fetchall()) if not d["dismissed"]]
+    rows = [d for d in (_shape(r) for r in con.execute(JOB_SELECT).fetchall())
+            if not d["dismissed"] and d["match_score"] is not None]
     if sector:
         rows = [d for d in rows if d.get("sector") == sector]
     if day and day != "all":
@@ -330,10 +331,7 @@ def tracker_rows(con) -> list[dict]:
     # Build contact count by normalize_company(company_key) -> count
     contact_counts: dict[str, int] = {}
     for r in con.execute(
-        "SELECT p.company_key, COUNT(*) AS cnt FROM people p "
-        "JOIN person_state s ON p.person_key = s.person_key "
-        "WHERE s.outreach_status IN ('contacted','followup_due','replied') "
-        "GROUP BY p.company_key"
+        "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
     ).fetchall():
         contact_counts[normalize_company(r["company_key"])] = r["cnt"]
 
@@ -365,10 +363,7 @@ def get_tracker_row(con, row_key: str) -> dict | None:
     """Single tracker row for HTMX swap after a status update."""
     contact_counts: dict[str, int] = {}
     for r in con.execute(
-        "SELECT p.company_key, COUNT(*) AS cnt FROM people p "
-        "JOIN person_state s ON p.person_key = s.person_key "
-        "WHERE s.outreach_status IN ('contacted','followup_due','replied') "
-        "GROUP BY p.company_key"
+        "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
     ).fetchall():
         contact_counts[normalize_company(r["company_key"])] = r["cnt"]
 
