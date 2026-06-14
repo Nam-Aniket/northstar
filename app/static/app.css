@@ -60,6 +60,18 @@ body{background:rgb(var(--c-bg));color:rgb(var(--c-ink));font-family:'Urbanist',
 .iconlink:hover{background:rgb(var(--c-sand));color:rgb(var(--c-ink));transform:translateY(-2px)}
 .iconlink.on{color:rgb(var(--c-accent))}
 
+/* Ramos dark top bar — dark nav (Ramos .navbar is dark) with light text, coral active + primary */
+.ns-topbar{background:rgb(13 13 13);border-bottom:1px solid rgb(38 38 38);color:#fff}
+.ns-topbar .navlink{color:rgb(184 184 184)}
+.ns-topbar .navlink:hover{color:#fff;background:rgba(255,255,255,.09)}
+.ns-topbar .navlink.active{color:#fff;background:rgb(var(--c-accent))}
+.ns-topbar .icon-btn{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:rgb(214 214 214)}
+.ns-topbar .icon-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.ns-topbar .sync-btn{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);color:#fff}
+.ns-topbar .sync-btn:hover{background:rgba(255,255,255,.14)}
+.ns-topbar .sync-btn--primary{background:rgb(var(--c-accent));border-color:transparent;color:#fff}
+.ns-topbar .sync-btn--primary:hover{background:rgb(var(--c-accent-d));box-shadow:var(--shadow-glow)}
+
 /* score gauge — SVG ring */
 .gauge{width:58px;height:58px;flex-shrink:0;display:block}
 .gauge circle{fill:none;stroke-width:3.2}
