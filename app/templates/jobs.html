@@ -27,7 +27,14 @@
   <a class="daystep {{ 'disabled' if not prev_day }}" href="/?day={{ prev_day }}" title="Older day" aria-label="Older day"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></a>
   <div class="daypill">
     <svg viewBox="0 0 24 24" class="w-4 h-4 text-clay" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-    <div><div class="daylabel">{{ current_day if current_day and current_day != 'all' else 'All days' }}</div><div class="daysub">{{ jobs|length }} {{ 'role' if jobs|length == 1 else 'roles' }}{% if view %} · {{ view.replace('_',' ') }}{% endif %}</div></div>
+    <div>
+      <input type="date" id="daypick" class="filter-select"
+             style="font-size:0.8rem;padding:0 0.25rem;height:1.6rem;width:auto;cursor:pointer"
+             {% if days %}min="{{ days[-1] }}" max="{{ days[0] }}"{% endif %}
+             {% if current_day and current_day != 'all' %}value="{{ current_day }}"{% endif %}
+             onchange="location.href='/?day='+this.value">
+      <div class="daysub">{{ jobs|length }} {{ 'role' if jobs|length == 1 else 'roles' }}{% if view %} · {{ view.replace('_',' ') }}{% endif %}</div>
+    </div>
   </div>
   <a class="daystep {{ 'disabled' if not next_day }}" href="/?day={{ next_day }}" title="Newer day" aria-label="Newer day"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
   <a class="daylink {{ 'active' if days and current_day == days[0] }}" href="/?day={{ days[0] if days else '' }}">Latest</a>

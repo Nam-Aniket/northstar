@@ -88,6 +88,10 @@ def get_jobs(con, q=None, sector=None, min_score=0, status=None,
         elif view == "starred":
             if not d["starred"]:
                 continue
+        else:
+            # Default board (view is None or empty): exclude applied jobs
+            if d["applied"]:
+                continue
         # dismissed filter (applies unless view already handled it)
         if view not in ("applied", "starred"):
             if not show_dismissed and d["dismissed"]:
@@ -330,11 +334,19 @@ def company_detail(con, company_key: str) -> dict:
     for p in con.execute("SELECT * FROM manual_people WHERE company_key=?", (company_key,)):
         if p["person_key"] not in seen_keys:
             people_rows.append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr, is_manual=True))
+    # Fetch scored jobs whose normalized company matches this company_key
+    job_rows = [
+        _shape(r) for r in con.execute(JOB_SELECT).fetchall()
+        if r["match_score"] is not None and normalize_company(r["company"] or "") == company_key
+    ]
+    job_rows.sort(key=lambda d: (d["match_score"] or 0), reverse=True)
+
     return {
         "company":     company_name,
         "company_key": company_key,
         "domain":      domain,
         "people":      people_rows,
+        "jobs":        job_rows,
     }
 
 
