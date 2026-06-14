@@ -593,14 +593,13 @@ def write_config(con) -> None:
     """Atomically update config.json: set search.target_keywords/location/recency_tpr."""
     import config as _config
 
-    # Read the existing config (or fall back to example)
-    cfg_path = _config._CONFIG_PATH
+    # Always WRITE to config.json (never the shipped template). Read the existing
+    # config.json as the base, falling back to config.example.json on first run.
+    cfg_path = _config.ROOT / "config.json"
     example_path = _config.ROOT / "config.example.json"
-    if cfg_path.exists():
-        with cfg_path.open(encoding="utf-8") as f:
-            data = json.load(f)
-    elif example_path.exists():
-        with example_path.open(encoding="utf-8") as f:
+    base_path = cfg_path if cfg_path.exists() else example_path
+    if base_path.exists():
+        with base_path.open(encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = {}

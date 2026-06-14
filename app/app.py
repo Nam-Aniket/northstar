@@ -181,6 +181,14 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     except Exception:
         pass  # parse failure must never break the skills flow
 
+    # Build facts.json for per-job tailored resume generation.
+    try:
+        from facts_bridge import build_facts, save_facts
+        facts = build_facts(parsed)
+        save_facts(facts, ROOT)
+    except Exception:
+        pass  # facts build failure must never break onboarding
+
     con = conn()
     queries.set_resume(con, dest.name, summary)
     onb = queries.get_onboarding(con)
@@ -198,6 +206,7 @@ def onboarding_resume_delete(request: Request):
     import config as _config
     real_skills = _config.ROOT / "skills.json"
     real_skills.unlink(missing_ok=True)
+    (_config.ROOT / "facts.json").unlink(missing_ok=True)
     con = conn()
     queries.clear_resume(con)
     onb = queries.get_onboarding(con)
