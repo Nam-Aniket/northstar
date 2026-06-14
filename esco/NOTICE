@@ -1,0 +1,18 @@
+ESCO global skills layer
+========================
+
+esco/skills_en.csv is derived from the ESCO classification v1.1.1, published by
+the European Commission.
+
+  ESCO (European Skills, Competences, Qualifications and Occupations)
+  (c) European Union, 2017-2024 — https://esco.ec.europa.eu/
+
+Redistributed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+Obtained via the Tabiya Open Dataset (CC BY 4.0):
+  https://github.com/tabiya-tech/tabiya-open-dataset
+
+Modifications: only preferredLabel, altLabels and skillType are retained;
+aliases shorter than 3 chars, purely numeric aliases, and a denylist of generic
+terms were removed to reduce false positives. Source IDs reference
+http://data.europa.eu/esco/skill/...

@@ -16,6 +16,10 @@ outreach.db
 *.db
 *.csv
 *.docx
+
+# ESCO global skills layer — committed reference data (CC BY 4.0)
+!esco/
+!esco/skills_en.csv
 app/control_panel.db
 job_alerts_raw.csv
 job_posts*.csv
