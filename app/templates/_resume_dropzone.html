@@ -12,7 +12,7 @@
     <label class="btn cursor-pointer">
       Choose file
       <input type="file" name="file" accept=".docx,.pdf" required class="sr-only"
-             onchange="this.closest('form').submit()">
+             onchange="this.form.requestSubmit()">
     </label>
   </form>
 </div>

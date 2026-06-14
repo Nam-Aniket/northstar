@@ -530,6 +530,12 @@ def onboarding_state(con) -> str:
 
 def set_resume(con, filename: str, summary: str) -> None:
     now = _now()
+    # Ensure the singleton row exists, else the UPDATE below is a no-op and
+    # skills_built never flips (the upload would appear to do nothing).
+    con.execute(
+        "INSERT OR IGNORE INTO onboarding(id, created_at, updated_at) VALUES(1,?,?)",
+        (now, now),
+    )
     con.execute(
         "UPDATE onboarding SET resume_filename=?, resume_uploaded_at=?, resume_summary=?, "
         "skills_built=1, updated_at=? WHERE id=1",
