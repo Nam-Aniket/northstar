@@ -112,9 +112,16 @@ def build_facts(parsed: dict) -> dict:
 
         # --- Ensure at least one bullet (validate_fact_bank: pool >= budget) ---
         if not kept:
-            # Restore the longest original bullet stripped of opener conflict
-            fallback = max(raw_bullets, key=len) if raw_bullets else f"Contributed to {role or 'the team'}."
-            kept = [fallback]
+            if raw_bullets:
+                kept = [max(raw_bullets, key=len)]  # keep a real bullet, never invent
+            elif role and not company and not dates:
+                # A role with no company, no dates, and no bullets is almost always a
+                # misparsed prose line, not a real job. Drop the slot entirely.
+                continue
+            else:
+                # A genuine header (role + company/dates) that simply listed no
+                # bullets: a neutral, truthful placeholder.
+                kept = [f"Contributed to {role}." if role else "Contributed to the team."]
 
         # --- Tag evidences: ontology match, filtered to TERM_BANK labels ---
         pool: List[Dict] = []

@@ -32,7 +32,8 @@ from typing import Any
 
 _EMPTY: dict = {
     "name": "", "email": "", "phone": "", "location": "", "linkedin": "",
-    "summary": "", "skills": "", "experiences": [], "education": [],
+    "summary": "", "skills": "", "inferred_skills": "",
+    "experiences": [], "education": [], "projects": [],
 }
 
 
@@ -60,10 +61,23 @@ _SKILLS_RE = re.compile(
     r"^(SKILLS|TECHNICAL SKILLS|COMPETENCIES|KEY SKILLS|CORE SKILLS|SKILLS & TOOLS|TOOLS & TECHNOLOGIES)$",
     re.IGNORECASE,
 )
+_PROJECTS_RE = re.compile(
+    r"^(PROJECTS|PERSONAL PROJECTS|KEY PROJECTS|SELECTED PROJECTS|SIDE PROJECTS)$",
+    re.IGNORECASE,
+)
+# Any other recognised section heading. Recognising these gives a hard boundary
+# so their content cannot leak into education/experience (the school="PROJECTS" bug).
+_OTHER_SECTION_RE = re.compile(
+    r"^(CERTIFICATIONS?|CERTIFICATES?|AWARDS?|HON(?:ORS|OURS)|ACHIEVEMENTS?|"
+    r"PUBLICATIONS?|VOLUNTEER(?:ING)?|INTERESTS|HOBBIES|REFERENCES|LANGUAGES|"
+    r"ACTIVITIES|MEMBERSHIPS?|AFFILIATIONS?)$",
+    re.IGNORECASE,
+)
 
 # A header line is short (<=4 words) and matches one of the above patterns.
 def _is_section_header(line: str) -> str | None:
-    """Return section key ('summary'|'experience'|'education'|'skills') or None."""
+    """Return a section key ('summary'|'experience'|'education'|'skills'|
+    'projects'|'other') or None."""
     stripped = line.strip()
     if not stripped or len(stripped.split()) > 4:
         return None
@@ -75,6 +89,10 @@ def _is_section_header(line: str) -> str | None:
         return "education"
     if _SKILLS_RE.match(stripped):
         return "skills"
+    if _PROJECTS_RE.match(stripped):
+        return "projects"
+    if _OTHER_SECTION_RE.match(stripped):
+        return "other"
     return None
 
 
@@ -208,34 +226,67 @@ def _is_date_only_line(line: str) -> bool:
     return False
 
 
-# A Role - Company line: no date, has a separator between two non-empty parts
-_ROLE_COMPANY_RE = re.compile(r".+\s+[-–|]\s+.+")
+# Role/company separator: a spaced dash/pipe or the word "at". NOT a bare comma
+# (prose has commas) and NOT any dash (hyphenated words like "cross-functional").
+_HEADER_SEP_RE = re.compile(r"\s+[-–|]\s+|\s+\bat\b\s+")
+# Common bullet-opener verbs (past/gerund). A header's company side never starts
+# with one of these; a line like "...| assigned Jira tickets..." is prose.
+_VERB_LEXICON = frozenset({
+    "mentored", "assigned", "reviewed", "built", "led", "managed", "developed",
+    "designed", "created", "analysed", "analyzed", "reduced", "increased",
+    "improved", "delivered", "implemented", "coordinated", "supported",
+    "maintained", "automated", "unblocked", "drove", "owned", "shipped",
+    "launched", "migrated", "optimised", "optimized", "engineered", "deployed",
+    "collaborated", "partnered", "presented", "researched", "tested", "wrote",
+    "processed", "validated", "reconciled", "configured", "trained", "achieved",
+})
 
 
-def _is_role_company_line(line: str) -> bool:
-    """True if line looks like 'Role - Company' without a date."""
-    stripped = line.strip()
-    if not stripped or _is_section_header(stripped):
+def _titleish(s: str) -> bool:
+    """True if a phrase looks like a proper name/title (most words capitalised),
+    not a prose clause."""
+    words = s.split()
+    if not words:
         return False
-    if _DATE_RE.search(stripped):
-        return False
-    return bool(_ROLE_COMPANY_RE.match(stripped))
+    caps = sum(1 for w in words if w[:1].isupper() or not w[:1].isalpha())
+    return caps >= max(1, len(words) // 2)
 
 
 def _is_entry_header(line: str) -> bool:
-    """True if line looks like an experience entry header (has dates or Role-Company pattern)."""
+    """True only when a line is SHAPED like an experience header (Role | Company [| Dates]),
+    not a bullet or a prose sentence. A real date range or two title-ish sides is required."""
     stripped = line.strip()
-    if not stripped:
+    if not stripped or _is_section_header(stripped):
         return False
-    if _is_section_header(stripped):
+    if _BULLET_RE.match(stripped):
+        return False  # explicit bullet marker -> never a header
+    if _is_date_only_line(stripped):
+        return True   # two-line layout: a date line under a role/company line
+    has_daterange = bool(_DATE_RANGE_RE.search(stripped))
+    # Reject sentence/prose shapes.
+    if stripped.endswith((".", ":", ";")):
         return False
-    # Has a year or date range
-    if _DATE_RE.search(stripped):
-        return True
-    # Role – Company with no date (two-line format)
-    if _is_role_company_line(stripped):
-        return True
-    return False
+    if stripped.count(",") >= 2:
+        return False
+    if len(stripped.split()) > 14:
+        return False
+    if not _HEADER_SEP_RE.search(stripped):
+        return False
+    # Split role / company once, after removing any date span.
+    core = _DATE_RANGE_RE.sub("", stripped).strip(" -–|,")
+    parts = _HEADER_SEP_RE.split(core, maxsplit=1)
+    left = parts[0].strip() if parts else ""
+    right = parts[1].strip() if len(parts) > 1 else ""
+    if not left or not right:
+        return has_daterange  # one-sided header carrying a date is acceptable
+    if len(left.split()) > 6 or len(right.split()) > 6:
+        return False
+    if right.split()[0].lower().strip(".,") in _VERB_LEXICON:
+        return False
+    # Without a date, require both sides to look like proper names/titles.
+    if not has_daterange and not (_titleish(left) and _titleish(right)):
+        return False
+    return True
 
 
 def _parse_entry_header(line: str) -> tuple[str, str, str]:
@@ -311,12 +362,89 @@ def _extract_experiences(block: list[str]) -> list[dict]:
     return entries
 
 
+def _extract_projects(block: list[str]) -> list[dict]:
+    """Parse a PROJECTS block into [{name, bullets}]. A short, non-bulleted,
+    non-prose line starts a new project; bullets and prose attach to it."""
+    projects: list[dict] = []
+    current: dict | None = None
+    for line in block:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _BULLET_RE.match(stripped):
+            if current is not None:
+                current["bullets"].append(_BULLET_RE.sub("", stripped).strip())
+            continue
+        # A project title: short and not a sentence. Otherwise treat as a bullet.
+        is_title = len(stripped.split()) <= 8 and not stripped.endswith((".", ":", ";"))
+        if is_title:
+            if current is not None:
+                projects.append(current)
+            current = {"name": stripped, "bullets": []}
+        elif current is not None:
+            current["bullets"].append(stripped)
+    if current is not None:
+        projects.append(current)
+    return projects
+
+
 # ---------------------------------------------------------------------------
 # Education parsing
 # ---------------------------------------------------------------------------
 
-_GPA_RE = re.compile(r"\b(?:GPA|WAM|CGPA)\b[\s:]*([0-9.]+(?:/[0-9.]+)?)", re.IGNORECASE)
+_GPA_RE = re.compile(r"\b(GPA|WAM|CGPA)\b[\s:]*([0-9.]+(?:/[0-9.]+)?)", re.IGNORECASE)
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+
+# Education field separators — used to split a single combined line into
+# degree / school / dates cleanly so the date is never duplicated at render.
+_DEGREE_KEYWORDS = re.compile(
+    r"\b(Bachelor|Master|Doctor|PhD|MBA|BEng|BSc|BE|BA|BComm|BCom|MCom|MEng|MSc|"
+    r"Diploma|Certificate|Associate|Honours|Hons|Grad\s?Dip|PostGrad|Graduate)\b",
+    re.IGNORECASE,
+)
+_INSTITUTION_RE = re.compile(
+    r"\b(University|College|Institute|School|TAFE|Polytechnic|Academy)\b", re.IGNORECASE
+)
+_MONTH_RE = re.compile(
+    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b", re.IGNORECASE
+)
+
+
+def _normalize_edu_dates(text: str) -> str:
+    """Return a clean 'YYYY - YYYY' (or single 'YYYY', or 'YYYY - Present') from a
+    date span in text, else ''. Strips months so the render shows years only."""
+    span = _DATE_RANGE_RE.search(text)
+    chunk = span.group() if span else text
+    years = re.findall(r"(?:19|20)\d{2}", chunk)
+    has_present = bool(re.search(r"present|current|now", chunk, re.IGNORECASE))
+    if len(years) >= 2:
+        return f"{years[0]} - {years[-1]}"
+    if years and (has_present or span):
+        return f"{years[0]} - Present" if has_present else years[0]
+    if years:
+        return years[0]
+    return "Present" if (span and has_present) else ""
+
+
+def _split_education_line(line: str) -> tuple[str, str, str]:
+    """Split a combined education line into (degree, school, dates). The degree
+    string never contains the school or the dates."""
+    work = _GPA_RE.sub("", line).strip()
+    dates = _normalize_edu_dates(work)
+    # Remove date tokens so they don't pollute degree/school segments.
+    work = _DATE_RANGE_RE.sub("", work)
+    work = _MONTH_RE.sub("", work)
+    work = re.sub(r"\b(19|20)\d{2}\b", "", work)
+    segments = [s.strip(" -–|") for s in work.split(",")]
+    segments = [s for s in segments if s]
+    degree = next((s for s in segments if _DEGREE_KEYWORDS.search(s)), "")
+    school = next((s for s in segments if _INSTITUTION_RE.search(s)), "")
+    leftovers = [s for s in segments if s not in (degree, school)]
+    if degree and leftovers:
+        degree = degree + ", " + ", ".join(leftovers)  # e.g. a major: "..., Computer Science"
+    elif not degree:
+        degree = segments[0] if segments else ""
+    return degree, school, dates
 
 
 def _extract_education(block: list[str]) -> list[dict]:
@@ -324,45 +452,39 @@ def _extract_education(block: list[str]) -> list[dict]:
     entries: list[dict] = []
     current: dict | None = None
 
+    def _new_entry(degree, school, dates):
+        return {"degree": degree, "school": school, "year": dates, "gpa": "", "gpa_label": ""}
+
     for line in block:
         stripped = line.strip()
         if not stripped:
             continue
 
         gpa_m = _GPA_RE.search(stripped)
-        year_m = _YEAR_RE.search(stripped)
-
-        # If this line looks like a degree header (contains degree keywords or is a new entry)
-        degree_keywords = re.compile(
-            r"\b(Bachelor|Master|Doctor|PhD|MBA|BEng|BSc|BE|BA|BComm|BCom|MCom|MEng|MSc|"
-            r"Diploma|Certificate|Associate|Honours|Hons|Grad\s?Dip|PostGrad|Graduate)\b",
-            re.IGNORECASE,
-        )
-        is_degree_line = bool(degree_keywords.search(stripped))
+        is_degree_line = bool(_DEGREE_KEYWORDS.search(stripped))
 
         if is_degree_line:
             if current is not None:
                 entries.append(current)
-            current = {"degree": stripped, "school": "", "year": "", "gpa": ""}
-            if year_m:
-                current["year"] = year_m.group()
+            degree, school, dates = _split_education_line(stripped)
+            current = _new_entry(degree, school, dates)
             if gpa_m:
-                current["gpa"] = gpa_m.group(1)
+                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
         elif current is not None:
-            # Subsequent lines: school name, year, gpa
-            if not current["school"] and not year_m and not gpa_m:
-                current["school"] = stripped
-            if year_m and not current["year"]:
-                current["year"] = year_m.group()
+            # Subsequent lines of a two-line layout: school, then dates, then gpa.
+            dates = _normalize_edu_dates(stripped)
             if gpa_m and not current["gpa"]:
-                current["gpa"] = gpa_m.group(1)
+                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
+            elif dates and not current["year"]:
+                current["year"] = dates
+            elif not current["school"] and not dates:
+                current["school"] = stripped
         else:
-            # No current entry yet — start a bare entry
-            current = {"degree": stripped, "school": "", "year": "", "gpa": ""}
-            if year_m:
-                current["year"] = year_m.group()
+            # No current entry yet — start a bare entry from the line.
+            degree, school, dates = _split_education_line(stripped)
+            current = _new_entry(degree or stripped, school, dates)
             if gpa_m:
-                current["gpa"] = gpa_m.group(1)
+                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
 
     if current is not None:
         entries.append(current)
@@ -556,25 +678,31 @@ def _parse_resume_inner(text: str, use_llm: bool) -> dict:
     summary = " ".join(l.strip() for l in summary_block if l.strip())
 
     # --- Skills ---
+    # Declared skills (from the SKILLS section) are the only ones rendered on the
+    # résumé / written to the profile — they are what the candidate actually claims.
+    # Ontology-inferred skills (matched anywhere in the résumé) are kept SEPARATE
+    # for the matcher, never asserted as declared, to avoid misrepresentation.
     skills_block = sections.get("skills", [])
-    skill_items: list[str] = []
-    if skills_block:
-        skill_items = _extract_skills_from_block(skills_block)
+    declared_items = _extract_skills_from_block(skills_block) if skills_block else []
 
-    # Union with ontology match_text so skills populate even with no SKILLS header
+    inferred_items: list[str] = []
     try:
         from ontology import match_text as _onto_match
-        onto_skills = _onto_match(text)
-        # Merge: ontology labels that aren't already in the explicit list
-        existing_lower = {s.lower() for s in skill_items}
-        for s in sorted(onto_skills):
-            if s.lower() not in existing_lower:
-                skill_items.append(s)
-                existing_lower.add(s.lower())
+        declared_lower = {s.lower() for s in declared_items}
+        for s in sorted(_onto_match(text)):
+            if s.lower() not in declared_lower:
+                inferred_items.append(s)
     except Exception:
         pass
 
+    if declared_items:
+        skill_items = declared_items
+    else:
+        # No SKILLS section: fall back to inferred so skills still populate (back-compat).
+        skill_items, inferred_items = inferred_items, []
+
     skills_str = ", ".join(s for s in skill_items if s)
+    inferred_str = ", ".join(inferred_items)
 
     # --- Experiences ---
     exp_block = sections.get("experience", [])
@@ -584,6 +712,9 @@ def _parse_resume_inner(text: str, use_llm: bool) -> dict:
     edu_block = sections.get("education", [])
     education = _extract_education(edu_block)
 
+    # --- Projects ---
+    projects = _extract_projects(sections.get("projects", []))
+
     det: dict = {
         "name": contact["name"],
         "email": contact["email"],
@@ -592,8 +723,10 @@ def _parse_resume_inner(text: str, use_llm: bool) -> dict:
         "linkedin": contact["linkedin"],
         "summary": summary,
         "skills": skills_str,
+        "inferred_skills": inferred_str,
         "experiences": experiences,
         "education": education,
+        "projects": projects,
     }
 
     # --- Optional LLM overlay ---

@@ -340,6 +340,7 @@ class _ConfigProxy:
             matching = cfg.get("matching", {})
             search = cfg.get("search", {})
             _edu_cfg = ident.get("education") or []
+            _proj_cfg = ident.get("projects") or []
             self._data = {
                 "NAME": ident.get("name", "Candidate Name"),
                 "CONTACT": ident.get("contact", ""),
@@ -348,6 +349,12 @@ class _ConfigProxy:
                     "Master of Data Science, State University, 2023 - 2025",
                     "Bachelor of Engineering, Computer Science, City University, 2016 - 2020",
                     "Professional Data Analytics Certificate",
+                ],
+                # The candidate's real projects (from the résumé). Empty -> the
+                # generator falls back to its generic sample projects.
+                "PROJECTS": [
+                    (p[0], list(p[1])) for p in _proj_cfg
+                    if isinstance(p, (list, tuple)) and len(p) == 2 and p[0]
                 ],
                 "needs_sponsorship": bool(ident.get("needs_sponsorship", False)),
                 # Optional knockout-comparison data. Absent -> the knockout layer

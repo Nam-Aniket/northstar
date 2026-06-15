@@ -70,7 +70,7 @@ from config import (  # noqa: E402
     SUPPORTED_TERMS, UNSUPPORTED_TERMS,
     _TERM_PATTERNS, _UNSUPPORTED_PATTERNS,
     _alias_pattern,
-    CONTACT, WORK_RIGHTS, NAME, EDUCATION,
+    CONTACT, WORK_RIGHTS, NAME, EDUCATION, PROJECTS,
 )
 
 def _get_exclude_companies():
@@ -656,7 +656,9 @@ def build_content(target: Dict[str, str], jd_text: str) -> Dict:
         "summary": summary,
         "skills_lines": skills_lines,
         "bullets_by_slot": bullets_by_slot,
-        "projects": projects_for(family),
+        # Real résumé projects win; the generic sample bank is the fallback only
+        # for users who supplied none (never fabricate over real ones).
+        "projects": list(PROJECTS) if PROJECTS else projects_for(family),
     }
 
 
