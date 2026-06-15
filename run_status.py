@@ -76,7 +76,22 @@ def acquire_lock() -> bool:
         os.close(fd)
         return True
     except FileExistsError:
-        return False
+        # Lock file present. Steal it ONLY if the holder PID is dead (is_running()
+        # does the liveness check). A single retry keeps this race-safe enough for
+        # one local user: a genuinely live holder still wins the O_EXCL create below.
+        if is_running():
+            return False
+        try:
+            LOCK_PATH.unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            fd = os.open(str(LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            return True
+        except FileExistsError:
+            return False  # someone re-created it between the unlink and the create
 
 
 def release_lock() -> None:

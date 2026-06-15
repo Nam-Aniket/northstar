@@ -599,6 +599,18 @@ def sync():
     return Response(status_code=204, headers={"HX-Redirect": "/"})
 
 
+@app.get("/run/log")
+def run_log_view():
+    import run_log
+    if not run_log.LATEST_PATH.exists():
+        return HTMLResponse("No run log yet. Click Run to start a pipeline run.", status_code=404)
+    return FileResponse(
+        run_log.LATEST_PATH.resolve(),
+        media_type="text/plain",
+        headers={"Content-Disposition": "inline; filename=latest.log"},
+    )
+
+
 @app.post("/run")
 def run_start(request: Request):
     import run_status
@@ -615,18 +627,28 @@ def run_start(request: Request):
             status_code=409,
             headers={"HX-Trigger": json.dumps({"toast": "Pipeline already running"})},
         )
+    # Capture this run's output to a persistent log file (no more silent DEVNULL).
+    import run_log
+    log_path = run_log.new_run_log_path()
+    run_log.update_latest(log_path)
+    logf = open(log_path, "ab")
+    env = {**os.environ, run_log.ENV_VAR: str(log_path)}
     kwargs: dict = {}
     if os.name == "posix":
         kwargs["start_new_session"] = True
     else:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
-    subprocess.Popen(
-        [sys.executable, str(ROOT / "daily_run.py")],
-        cwd=str(ROOT),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        **kwargs,
-    )
+    try:
+        subprocess.Popen(
+            [sys.executable, str(ROOT / "daily_run.py")],
+            cwd=str(ROOT),
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            env=env,
+            **kwargs,
+        )
+    finally:
+        logf.close()  # the child holds its own dup of the fd
     return templates.TemplateResponse(
         request, "_run_progress.html", {"st": {"stage": "discover", "pct": 2, "message": "Starting…"}}
     )

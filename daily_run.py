@@ -7,14 +7,20 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+import run_log
 import run_status
 from run_pipeline import SCRIPTS
 
 ROOT = Path(__file__).parent
+
+# Open run-log handle for this run (set in main); _log() mirrors output into it.
+_LOG = None
+_ECHO = True  # also print to stdout for terminal visibility; off when app-launched
 
 # Network-dependent stages: a non-zero exit is logged but never stops the run.
 _NON_FATAL = {"discover", "fetch"}
@@ -35,6 +41,15 @@ _STAGE_MSG = {
 
 def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def _log(line: str = "") -> None:
+    """Write a line to the run log, and echo to stdout unless app-launched."""
+    if _ECHO:
+        print(line, flush=True)
+    if _LOG is not None:
+        _LOG.write(line + "\n")
+        _LOG.flush()
 
 
 def _discover_args() -> list[str]:
@@ -63,14 +78,22 @@ def _discover_args() -> list[str]:
 
 def _run_stage(name: str) -> tuple[bool, str]:
     extra = _discover_args() if name == "discover" else _STAGE_ARGS.get(name, [])
+    start = datetime.datetime.now()
+    _log(f"\n----- stage {name} START {start.isoformat(timespec='seconds')} -----")
     r = subprocess.run(
         [sys.executable, str(SCRIPTS[name]), *extra],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
     )
+    dur = (datetime.datetime.now() - start).total_seconds()
+    if r.stdout:
+        _log(r.stdout.rstrip())
+    if r.stderr:
+        _log("[stderr]\n" + r.stderr.rstrip())
+    _log(f"----- stage {name} END rc={r.returncode} dur={dur:.1f}s -----")
     ok = r.returncode == 0
-    err = (r.stderr or "")[-500:]
+    err = (r.stderr or "")[-500:]  # short tail still feeds the status UI
     return ok, err
 
 
@@ -89,9 +112,29 @@ def main() -> None:
     )
     args = ap.parse_args()
 
+    global _LOG, _ECHO
+    app_launched = bool(os.environ.get(run_log.ENV_VAR))
+    log_path = Path(os.environ[run_log.ENV_VAR]) if app_launched else run_log.new_run_log_path()
+    _LOG = open(log_path, "a", encoding="utf-8", buffering=1)
+    _ECHO = not app_launched  # app redirects stdout into this same file; don't double-write
+
     base_order = ["discover", "fetch", "prepare", "score", "generate"]
     start_idx = base_order.index(args.from_stage)
     order = base_order[start_idx:]
+
+    _log(f"=== Northstar run {_now()} ===")
+    _log(f"launched: {'app' if app_launched else 'terminal'}  stages={order}")
+    try:
+        from app import db as _db, queries as _q
+        _con = _db.connect()
+        _db.init_schema(_con)
+        roles = [p["display"] for p in _q.list_positions(_con)]
+        locs = [l["display"] for l in _q.list_locations(_con)]
+        tpr = (_q.get_onboarding(_con).get("recency_tpr") or "r86400")
+        _con.close()
+        _log(f"config: roles={roles or '(defaults)'} locations={locs or '(defaults)'} recency={tpr}")
+    except Exception as e:
+        _log(f"config: (unavailable: {e})")
 
     # Fresh discovery merges into job_alerts_raw.csv; a stale job_posts_enriched.csv
     # would shadow it at the prepare step, so drop it whenever we re-discover.
@@ -99,8 +142,11 @@ def main() -> None:
         (ROOT / "job_posts_enriched.csv").unlink(missing_ok=True)
 
     if not run_status.acquire_lock():
-        print("already running")
+        _log("another run holds the lock; exiting without starting")
+        _LOG.close()
         sys.exit(0)
+
+    run_log.update_latest(log_path)
 
     try:
         run_status.write(
@@ -122,6 +168,7 @@ def main() -> None:
             )
             ok, err = _run_stage(name)
             if not ok and name not in _NON_FATAL:
+                _log(f"=== FAILED at {name} (full stage output above) ===")
                 run_status.write(
                     stage="error",
                     ok=False,
@@ -134,6 +181,7 @@ def main() -> None:
 
         # Sync step — in-process, transactional
         run_status.write(stage="sync", pct=92, message="Updating dashboard...")
+        _log("\n----- stage sync START -----")
         try:
             from app import db
             from app import sync as appsync
@@ -141,8 +189,14 @@ def main() -> None:
             con = db.connect()
             db.init_schema(con)
             appsync.sync(con, _now())
+            total = con.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+            scored = con.execute("SELECT COUNT(*) FROM jobs WHERE match_score IS NOT NULL").fetchone()[0]
             con.close()
+            _log("----- stage sync END -----")
         except Exception as e:
+            import traceback
+            _log("[stderr]\n" + traceback.format_exc())
+            _log(f"=== FAILED at sync : {e} ===")
             run_status.write(
                 stage="error",
                 ok=False,
@@ -154,9 +208,12 @@ def main() -> None:
             return
 
         run_status.write(stage="done", pct=100, message="Up to date", ok=True, finished_at=_now())
+        _log(f"=== SUCCESS : {total} postings synced, {scored} scored onto the board ===")
 
     finally:
         run_status.release_lock()
+        if _LOG is not None:
+            _LOG.close()
 
 
 if __name__ == "__main__":

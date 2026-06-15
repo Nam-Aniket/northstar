@@ -14,6 +14,7 @@
       <div class="run-pill__top"><b>Run failed at {{ st.error_stage }}</b></div>
       <div class="run-pill__msg--wrap">Your dashboard is unchanged.</div>
       <details><summary>details</summary><pre>{{ st.error_detail }}</pre></details>
+      <a href="/run/log" target="_blank" rel="noopener" class="run-log-link">View full run log</a>
     </div>
   {% endif %}
 </div>
