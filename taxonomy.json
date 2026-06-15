@@ -119,6 +119,10 @@
     "aliases": ["etl", "elt", "extract transform load", "extract, transform, load", "extract-transform-load"],
     "group": "Data Engineering"
   },
+  "Data Engineering": {
+    "aliases": ["data engineering", "data engineer", "data engineering pipeline", "data engineering pipelines"],
+    "group": "Data Engineering"
+  },
   "Data Pipelines": {
     "aliases": ["data pipeline", "data pipelines", "data ingestion", "data integration"],
     "group": "Data Engineering"

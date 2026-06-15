@@ -34,7 +34,7 @@ import unicodedata
 from pathlib import Path
 from typing import Dict, Optional, Set
 
-from matcher import build_automaton, find, _Automaton
+from matcher import build_automaton, find, find_detailed, _Automaton
 
 ROOT = Path(__file__).resolve().parent
 
@@ -175,6 +175,18 @@ def _get_automaton() -> _Automaton:
 def match_text(text: str) -> Set[str]:
     """Return the set of canonical skill labels matched in text."""
     return find(text, _get_automaton())
+
+
+def match_text_detailed(text: str) -> Dict[str, Dict[str, int]]:
+    """Return {label: {"freq": int, "first_pos": int}} over the FULL taxonomy.
+
+    first_pos indexes into the lowercased text — the scorer compares it against
+    the requirements-region anchor to weight region hits higher."""
+    spans = find_detailed(text, _get_automaton())
+    return {
+        label: {"freq": len(hits), "first_pos": min(s for s, _ in hits)}
+        for label, hits in spans.items()
+    }
 
 
 # ---------------------------------------------------------------------------

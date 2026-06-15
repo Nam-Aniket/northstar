@@ -31,6 +31,11 @@ from typing import Dict, List
 
 ROOT = Path(__file__).resolve().parent
 
+# Below this many recognised résumé skills, surface a "thin profile" nudge in
+# onboarding and the run log. Calibrated against the local corpus: a ~4-skill
+# profile still matches its core roles, but fewer than this is worth flagging.
+LOW_SKILL_FLOOR = 8
+
 # ---------------------------------------------------------------------------
 # File resolution — env override > real file > example fallback
 # ---------------------------------------------------------------------------
@@ -339,6 +344,10 @@ class _ConfigProxy:
                     "Professional Data Analytics Certificate",
                 ],
                 "needs_sponsorship": bool(ident.get("needs_sponsorship", False)),
+                # Optional knockout-comparison data. Absent -> the knockout layer
+                # degrades to "unknown / verify" rather than false-failing a job.
+                "years_experience": ident.get("years_experience", None),
+                "certifications": list(ident.get("certifications", [])),
                 "seniority_cap": matching.get("seniority_cap", None),
                 "generation_enabled": bool(matching.get("generation_enabled", False)),
                 "keep_threshold": int(matching.get("keep_threshold", 45)),

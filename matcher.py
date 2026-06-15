@@ -133,3 +133,28 @@ def find(text: str, automaton: _Automaton) -> Set[str]:
                 results.add(label)
 
     return results
+
+
+def find_detailed(text: str, automaton: _Automaton) -> Dict[str, list]:
+    """Like find(), but return {label: [(start, end), ...]} for every boundary-
+    valid hit. Spans index into the lowercased text. Used by the scorer to weight
+    requirements by frequency and JD-region position."""
+    text = text.lower()
+    n = len(text)
+    results: Dict[str, list] = {}
+    node = automaton.root
+
+    for i, ch in enumerate(text):
+        while node is not automaton.root and ch not in node.children:
+            node = node.fail  # type: ignore[assignment]
+        if ch in node.children:
+            node = node.children[ch]
+        for label, alias_len in node.output:
+            start = i - alias_len + 1
+            end = i + 1
+            before_ok = start == 0 or text[start - 1] not in _WORD_CHAR
+            after_ok = end == n or text[end] not in _WORD_CHAR
+            if before_ok and after_ok:
+                results.setdefault(label, []).append((start, end))
+
+    return results

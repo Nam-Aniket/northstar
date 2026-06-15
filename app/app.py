@@ -180,6 +180,9 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     )
     n_groups = len(by_group)
     summary = f"Found {n_skills} skills across {n_groups} groups"
+    if n_skills < _config.LOW_SKILL_FLOOR:
+        summary += (f". Only {n_skills} detected - add more detail (tools, "
+                    "technologies, methods) so more jobs can match.")
 
     # Parse résumé into the Builder schema and cache for prefill
     try:

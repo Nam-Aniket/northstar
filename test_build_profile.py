@@ -87,11 +87,15 @@ class TestBuildSkillsJson(unittest.TestCase):
         self.assertIn("SQL", result["supported_skills"])
         self.assertIn("Python", result["supported_skills"])
 
-    def test_absent_in_unsupported(self):
-        """Labels not in present appear in unsupported_skills."""
+    def test_absent_dropped_not_marked_as_gap(self):
+        """Labels not on the résumé appear in NEITHER bank — absence is not a gap.
+
+        Auto-filing unmatched labels into unsupported_skills made the scorer treat
+        them as hard "cannot do" gaps, collapsing incomplete-résumé scores to 0.
+        """
         present = {"SQL"}
         result = build_skills_json(present, self.taxonomy)
-        self.assertIn("Kafka", result["unsupported_skills"])
+        self.assertNotIn("Kafka", result["unsupported_skills"])
         self.assertNotIn("Kafka", result["supported_skills"])
 
     def test_supported_shape(self):
@@ -102,13 +106,11 @@ class TestBuildSkillsJson(unittest.TestCase):
         self.assertIn("aliases", entry)
         self.assertIn("group", entry)
 
-    def test_unsupported_shape(self):
-        """unsupported_skills entries must be lists of alias strings."""
-        present = set()
-        result = build_skills_json(present, self.taxonomy)
-        kafka_entry = result["unsupported_skills"]["Kafka"]
-        self.assertIsInstance(kafka_entry, list)
-        self.assertTrue(all(isinstance(a, str) for a in kafka_entry))
+    def test_unsupported_bank_is_empty(self):
+        """unsupported_skills is intentionally empty — genuine 'cannot do'
+        exclusions are hand-curated, never derived from résumé absence."""
+        result = build_skills_json({"SQL", "Python"}, self.taxonomy)
+        self.assertEqual(result["unsupported_skills"], {})
 
     def test_soft_flag_preserved(self):
         """soft:true must be preserved in supported_skills when present in taxonomy."""
@@ -124,12 +126,14 @@ class TestBuildSkillsJson(unittest.TestCase):
         overlap = set(result["supported_skills"]) & set(result["unsupported_skills"])
         self.assertEqual(overlap, set(), f"Labels in both sections: {overlap}")
 
-    def test_every_taxonomy_label_in_output(self):
-        """Every taxonomy label must appear in exactly one section."""
+    def test_supported_is_subset_of_taxonomy(self):
+        """Matched labels come from the taxonomy; unmatched labels appear nowhere."""
         present = {"SQL", "Python"}
         result = build_skills_json(present, self.taxonomy)
-        covered = set(result["supported_skills"]) | set(result["unsupported_skills"])
-        self.assertEqual(covered, set(self.taxonomy.keys()))
+        self.assertTrue(set(result["supported_skills"]).issubset(set(self.taxonomy.keys())))
+        # an unmatched label is in neither section
+        self.assertNotIn("Kafka", result["supported_skills"])
+        self.assertNotIn("Kafka", result["unsupported_skills"])
 
     def test_output_round_trips_as_json(self):
         """Output must be JSON-serialisable."""
@@ -170,9 +174,51 @@ class TestCLI(unittest.TestCase):
             self.assertIn("SQL", skills["supported_skills"])
             self.assertIn("Python", skills["supported_skills"])
             self.assertNotIn("Kafka", skills["supported_skills"])
-            self.assertIn("Kafka", skills["unsupported_skills"])
+            self.assertEqual(skills["unsupported_skills"], {})
         finally:
             Path(out_path).unlink(missing_ok=True)
+
+
+class TestIncompleteResumeScores(unittest.TestCase):
+    """Regression: an incomplete résumé must still match its core jobs.
+
+    Before the fix, build_skills_json filed every unmatched taxonomy label into
+    unsupported_skills, the scorer counted them as hard gaps, and a 4-skill
+    résumé scored single digits on every JD (0 kept). With the empty unsupported
+    bank, a 4-skill profile still clears the keep bar on a core-matching JD.
+    """
+
+    def setUp(self):
+        self.taxonomy = _load_taxonomy(TAXONOMY_PATH)
+
+    def test_four_skill_resume_clears_keep_bar_on_core_jd(self):
+        import subprocess, sys
+        skills = build_skills_json({"SQL", "Python", "Tableau", "Dashboarding"}, self.taxonomy)
+        self.assertEqual(skills["unsupported_skills"], {})  # precondition: the fix is in place
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(skills, tmp)
+            bank_path = tmp.name
+        try:
+            code = (
+                "from score_jobs import score_job, KEEP_THRESHOLD;"
+                "jd='Requirements: strong SQL, Python and Tableau for dashboarding, reporting and analysis.';"
+                "r=score_job('Data Analyst', jd);"
+                "print(r['fit']);"
+                "import sys; sys.exit(0 if r['fit'] >= KEEP_THRESHOLD else 1)"
+            )
+            env = dict(os.environ, JOBENGINE_SKILLS=bank_path, JOBENGINE_CONFIG="config.example.json")
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                capture_output=True, text=True,
+                cwd=str(Path(__file__).resolve().parent), env=env,
+            )
+            self.assertEqual(
+                result.returncode, 0,
+                f"4-skill résumé scored {result.stdout.strip()} on a core JD — "
+                f"below the keep bar (regression).\n{result.stderr}",
+            )
+        finally:
+            Path(bank_path).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
