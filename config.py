@@ -362,7 +362,7 @@ class _ConfigProxy:
                 "years_experience": ident.get("years_experience", None),
                 "certifications": list(ident.get("certifications", [])),
                 "seniority_cap": matching.get("seniority_cap", None),
-                "generation_enabled": bool(matching.get("generation_enabled", False)),
+                "generation_enabled": bool(matching.get("generation_enabled", True)),
                 "keep_threshold": int(matching.get("keep_threshold", 45)),
                 "strong_threshold": int(matching.get("strong_threshold", 68)),
                 "exclude_companies": list(matching.get("exclude_companies", [])),

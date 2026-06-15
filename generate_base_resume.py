@@ -19,6 +19,7 @@ from generate_accepted_resumes import (
     EXPERIENCE_SLOTS,
     FACT_BANK,
     OUT_ROOT,
+    _facts_override,
     compact_skills,
     projects_for,
     select_bullets,
@@ -29,8 +30,12 @@ from generate_accepted_resumes import (
 
 
 def generate_base_resume(label: str, family: str) -> None:
-    if not config.generation_enabled or not FACT_BANK:
-        print("Resume generation is OFF for this profile (v1 ships matching only). Enable it in config.json.")
+    if not config.generation_enabled:
+        print("Resume generation is OFF for this profile. Enable it in config.json (matching.generation_enabled).")
+        return
+    if _facts_override is None:
+        print("Resume generation is ON but no resume data found. Upload your resume in onboarding "
+              "to generate resumes (skipping - will not build from placeholder data).")
         return
 
     OUT_ROOT.mkdir(exist_ok=True)
