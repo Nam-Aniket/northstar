@@ -348,5 +348,38 @@ class TestSoftWeighting(unittest.TestCase):
         self.assertGreaterEqual(r["fit"], KEEP_THRESHOLD)
 
 
+class TestStrictTokenR(unittest.TestCase):
+    """Bare 'R' (the language) recognised in skill-list contexts, without the
+    R&D / prose false positives. The Aho-Corasick and regex paths must agree."""
+
+    def test_matcher_regex_parity(self):
+        from matcher import build_automaton, find
+        from config import _alias_pattern
+        auto = build_automaton({"r": "R"})
+        pat = _alias_pattern("r")
+        battery = [
+            "python, r, sql", "r/python", "python/r", "languages: r, python",
+            "r&d team", "(r)", "4(r)", "skilled in r.", "hr analytics",
+            "your team", "r-python", "  r  ", "r", "ml, r, nlp",
+        ]
+        for s in battery:
+            s = s.lower()
+            self.assertEqual("R" in find(s, auto), bool(pat.search(s)),
+                             f"matcher/regex disagree on {s!r}")
+
+    def test_r_recall_in_skill_lists(self):
+        for jd in ["Skills: Python, R, SQL, Tableau",
+                   "Requirements: strong R and Python",
+                   "Languages: R/Python/SQL"]:
+            self.assertIn("R", extract_terms_detailed(jd)[0], f"R missed in {jd!r}")
+        r = score_job("Data Analyst", "Requirements: SQL, Python, R and Tableau for analysis.")
+        self.assertIn("R", r["supported"])
+
+    def test_r_precision_no_false_match(self):
+        for jd in ["Work in our R&D team", "see section 4(r)", "skilled in R.",
+                   "HR analytics role", "bring your skills", "R-Python interop"]:
+            self.assertNotIn("R", extract_terms_detailed(jd)[0], f"R falsely matched in {jd!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

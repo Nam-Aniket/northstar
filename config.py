@@ -167,6 +167,12 @@ UNSUPPORTED_BANK: Dict[str, List[str]] = _LazyBank("unsupported_skills")
 # ---------------------------------------------------------------------------
 
 def _alias_pattern(alias: str) -> re.Pattern:
+    # Strict short tokens (e.g. "r") require a list separator on each side, matching
+    # matcher._accept exactly so the regex path and the Aho-Corasick path agree.
+    from matcher import _STRICT_TOKENS, _STRICT_NEIGHBOR_OK
+    if alias in _STRICT_TOKENS:
+        cls = re.escape("".join(sorted(_STRICT_NEIGHBOR_OK)))
+        return re.compile(rf"(?:^|(?<=[{cls}])){re.escape(alias)}(?=$|[{cls}])")
     return re.compile(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])")
 
 

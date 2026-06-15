@@ -9,7 +9,7 @@
       "group": "Analytics & BI"
     },
     "R": {
-      "aliases": ["r programming", "r language", "rlang"],
+      "aliases": ["r programming", "r language", "rlang", "r"],
       "group": "Data Science"
     },
     "Power BI": {
