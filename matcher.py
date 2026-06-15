@@ -105,6 +105,26 @@ def build_automaton(alias_map: Dict[str, str]) -> _Automaton:
 
 _WORD_CHAR: FrozenSet[str] = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
 
+# Ambiguous short tokens (e.g. the language "R") need a STRICTER neighbour rule
+# than the default "not [a-z0-9]": a bare "r" must sit between explicit list
+# separators, so "Python, R, SQL" and "R/Python" match but "R&D", "(r)", "R."
+# and prose "R" do not. config._alias_pattern imports these two sets so the
+# regex path applies the identical rule (the two matchers stay in lockstep).
+_STRICT_TOKENS: FrozenSet[str] = frozenset({"r"})
+_STRICT_NEIGHBOR_OK: FrozenSet[str] = frozenset(" ,/|\n\t;•")
+
+
+def _accept(text: str, start: int, end: int) -> bool:
+    """Boundary check. Strict tokens require a separator (not just a non-word
+    char) on each side; everything else uses the default [a-z0-9] guard."""
+    if text[start:end] in _STRICT_TOKENS:
+        left_ok = start == 0 or text[start - 1] in _STRICT_NEIGHBOR_OK
+        right_ok = end == len(text) or text[end] in _STRICT_NEIGHBOR_OK
+        return left_ok and right_ok
+    before_ok = start == 0 or text[start - 1] not in _WORD_CHAR
+    after_ok = end == len(text) or text[end] not in _WORD_CHAR
+    return before_ok and after_ok
+
 
 def find(text: str, automaton: _Automaton) -> Set[str]:
     """Return canonical labels matched in *text* with word-boundary guards.
@@ -113,7 +133,6 @@ def find(text: str, automaton: _Automaton) -> Set[str]:
     after the alias end are not in [a-z0-9] (same rule as config._alias_pattern).
     """
     text = text.lower()
-    n = len(text)
     results: Set[str] = set()
     node = automaton.root
 
@@ -126,10 +145,29 @@ def find(text: str, automaton: _Automaton) -> Set[str]:
         # i is the index of the last consumed character
         for label, alias_len in node.output:
             start = i - alias_len + 1
-            end = i + 1  # exclusive
-            before_ok = start == 0 or text[start - 1] not in _WORD_CHAR
-            after_ok = end == n or text[end] not in _WORD_CHAR
-            if before_ok and after_ok:
+            if _accept(text, start, i + 1):
                 results.add(label)
+
+    return results
+
+
+def find_detailed(text: str, automaton: _Automaton) -> Dict[str, list]:
+    """Like find(), but return {label: [(start, end), ...]} for every boundary-
+    valid hit. Spans index into the lowercased text. Used by the scorer to weight
+    requirements by frequency and JD-region position."""
+    text = text.lower()
+    results: Dict[str, list] = {}
+    node = automaton.root
+
+    for i, ch in enumerate(text):
+        while node is not automaton.root and ch not in node.children:
+            node = node.fail  # type: ignore[assignment]
+        if ch in node.children:
+            node = node.children[ch]
+        for label, alias_len in node.output:
+            start = i - alias_len + 1
+            end = i + 1
+            if _accept(text, start, end):
+                results.setdefault(label, []).append((start, end))
 
     return results

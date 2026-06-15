@@ -8,7 +8,7 @@
     "group": "Programming"
   },
   "R": {
-    "aliases": ["r programming", "r language", "rlang"],
+    "aliases": ["r programming", "r language", "rlang", "r"],
     "group": "Programming"
   },
   "Java": {
@@ -45,78 +45,82 @@
   },
   "Power BI": {
     "aliases": ["power bi", "powerbi"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Tableau": {
     "aliases": ["tableau"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Looker": {
     "aliases": ["looker", "looker studio", "google looker"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Excel": {
     "aliases": ["excel", "microsoft excel", "ms excel"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "DAX": {
     "aliases": ["dax"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Power Query": {
     "aliases": ["power query", "m language", "powerquery"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Dashboarding": {
     "aliases": ["dashboarding", "dashboard", "dashboards"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Data Visualisation": {
     "aliases": ["data visualisation", "data visualization", "visualisation", "visualization"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Data Storytelling": {
     "aliases": ["data storytelling", "storytelling with data", "storytelling"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "KPI Reporting": {
     "aliases": ["kpi reporting", "kpi dashboards", "kpi metrics", "kpi"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Self-Service BI": {
     "aliases": ["self-service bi", "self-service analytics", "self-service reporting", "self service bi", "self service analytics", "self service reporting", "self-service"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Insights": {
     "aliases": ["insights", "data insights", "business insights"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Reporting": {
     "aliases": ["reporting", "business reporting", "management reporting", "report development"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Qlik": {
     "aliases": ["qlik", "qliksense", "qlik sense", "qlikview"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "MicroStrategy": {
     "aliases": ["microstrategy", "mstr"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "SSRS": {
     "aliases": ["ssrs", "sql server reporting services"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Google Analytics": {
     "aliases": ["google analytics", "ga4", "google analytics 4", "universal analytics"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Metabase": {
     "aliases": ["metabase"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "ETL": {
     "aliases": ["etl", "elt", "extract transform load", "extract, transform, load", "extract-transform-load"],
+    "group": "Data Engineering"
+  },
+  "Data Engineering": {
+    "aliases": ["data engineering", "data engineer", "data engineering pipeline", "data engineering pipelines"],
     "group": "Data Engineering"
   },
   "Data Pipelines": {
@@ -515,11 +519,11 @@
   },
   "Power Automate": {
     "aliases": ["power automate", "power apps", "ms power platform", "microsoft power platform"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "SAP": {
     "aliases": ["sap", "sap hana", "sap bw", "sap analytics cloud"],
-    "group": "Data & BI"
+    "group": "Analytics & BI"
   },
   "Salesforce": {
     "aliases": ["salesforce", "sfdc", "crm"],

@@ -31,6 +31,11 @@ from typing import Dict, List
 
 ROOT = Path(__file__).resolve().parent
 
+# Below this many recognised résumé skills, surface a "thin profile" nudge in
+# onboarding and the run log. Calibrated against the local corpus: a ~4-skill
+# profile still matches its core roles, but fewer than this is worth flagging.
+LOW_SKILL_FLOOR = 8
+
 # ---------------------------------------------------------------------------
 # File resolution — env override > real file > example fallback
 # ---------------------------------------------------------------------------
@@ -162,6 +167,12 @@ UNSUPPORTED_BANK: Dict[str, List[str]] = _LazyBank("unsupported_skills")
 # ---------------------------------------------------------------------------
 
 def _alias_pattern(alias: str) -> re.Pattern:
+    # Strict short tokens (e.g. "r") require a list separator on each side, matching
+    # matcher._accept exactly so the regex path and the Aho-Corasick path agree.
+    from matcher import _STRICT_TOKENS, _STRICT_NEIGHBOR_OK
+    if alias in _STRICT_TOKENS:
+        cls = re.escape("".join(sorted(_STRICT_NEIGHBOR_OK)))
+        return re.compile(rf"(?:^|(?<=[{cls}])){re.escape(alias)}(?=$|[{cls}])")
     return re.compile(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])")
 
 
@@ -329,6 +340,7 @@ class _ConfigProxy:
             matching = cfg.get("matching", {})
             search = cfg.get("search", {})
             _edu_cfg = ident.get("education") or []
+            _proj_cfg = ident.get("projects") or []
             self._data = {
                 "NAME": ident.get("name", "Candidate Name"),
                 "CONTACT": ident.get("contact", ""),
@@ -338,7 +350,17 @@ class _ConfigProxy:
                     "Bachelor of Engineering, Computer Science, City University, 2016 - 2020",
                     "Professional Data Analytics Certificate",
                 ],
+                # The candidate's real projects (from the résumé). Empty -> the
+                # generator falls back to its generic sample projects.
+                "PROJECTS": [
+                    (p[0], list(p[1])) for p in _proj_cfg
+                    if isinstance(p, (list, tuple)) and len(p) == 2 and p[0]
+                ],
                 "needs_sponsorship": bool(ident.get("needs_sponsorship", False)),
+                # Optional knockout-comparison data. Absent -> the knockout layer
+                # degrades to "unknown / verify" rather than false-failing a job.
+                "years_experience": ident.get("years_experience", None),
+                "certifications": list(ident.get("certifications", [])),
                 "seniority_cap": matching.get("seniority_cap", None),
                 "generation_enabled": bool(matching.get("generation_enabled", False)),
                 "keep_threshold": int(matching.get("keep_threshold", 45)),

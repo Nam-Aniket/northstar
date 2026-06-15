@@ -180,6 +180,9 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     )
     n_groups = len(by_group)
     summary = f"Found {n_skills} skills across {n_groups} groups"
+    if n_skills < _config.LOW_SKILL_FLOOR:
+        summary += (f". Only {n_skills} detected - add more detail (tools, "
+                    "technologies, methods) so more jobs can match.")
 
     # Parse résumé into the Builder schema and cache for prefill
     try:
@@ -218,13 +221,27 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
         pass  # identity write must never break onboarding
 
     try:
-        _edu_lines = [
-            ", ".join(filter(None, [e.get("degree"), e.get("school"), e.get("year")]))
-            for e in (parsed.get("education") or [])
-        ]
+        def _edu_line(e):
+            parts = [e.get("degree"), e.get("school"), e.get("year")]
+            gpa = (e.get("gpa") or "").strip()
+            if gpa:
+                label = (e.get("gpa_label") or "").strip()
+                parts.append(f"{label} {gpa}".strip())  # unlabeled score renders as-is
+            return ", ".join(p.strip() for p in parts if p and p.strip())
+        _edu_lines = [_edu_line(e) for e in (parsed.get("education") or [])]
         queries.set_education(_edu_lines)
     except Exception:
         pass  # education write must never break onboarding
+
+    try:
+        _projects = [
+            [p.get("name", ""), list(p.get("bullets") or [])]
+            for p in (parsed.get("projects") or []) if p.get("name")
+        ]
+        if _projects:
+            queries.set_projects(_projects)
+    except Exception:
+        pass  # projects write must never break onboarding
 
     con = conn()
     queries.set_resume(con, dest.name, summary)

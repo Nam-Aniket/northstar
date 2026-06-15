@@ -16,6 +16,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from config import LOW_SKILL_FLOOR
+
 # ---------------------------------------------------------------------------
 # Text extraction
 # ---------------------------------------------------------------------------
@@ -188,12 +190,16 @@ def _llm_match(text: str, taxonomy: dict) -> tuple[set[str], list[str]]:
 def build_skills_json(present: set[str], taxonomy: dict) -> dict:
     """Build the skills.json dict from present labels and full taxonomy.
 
-    Taxonomy labels are partitioned into supported/unsupported as before.
-    Labels in *present* that are NOT in the curated taxonomy (i.e. came from
-    an extended ontology like ESCO) are appended to supported_skills using
-    ontology.group_for() for their group.  unsupported_skills contains only
-    curated taxonomy labels not matched — the full ontology label universe is
-    never materialised there.
+    supported_skills holds the matched taxonomy labels (plus any present labels
+    from an extended ontology like ESCO, grouped via ontology.group_for()).
+
+    unsupported_skills is intentionally emitted EMPTY. A skill the résumé does
+    not mention is NOT evidence the candidate "cannot do" it — yet the scorer
+    treats the unsupported bank as hard "cannot do" gaps (score_jobs._lacked_weight).
+    Auto-filing every unmatched taxonomy label there made an incomplete résumé
+    look like it lacked ~150 skills, collapsing every job's Fit to single digits
+    (0 kept). Genuine exclusions are a small, hand-curated set (see
+    skills.example.json), not derived from absence.
     """
     # Child -> parent roll-up: if a concrete child skill is present, also
     # promote its umbrella parent so it lands in supported, not unsupported.
@@ -215,9 +221,10 @@ def build_skills_json(present: set[str], taxonomy: dict) -> dict:
             present.add(parent)
 
     supported: dict = {}
-    unsupported: dict = {}
+    unsupported: dict = {}  # intentionally left empty — see docstring
 
-    # Partition curated taxonomy labels
+    # Collect matched curated taxonomy labels. Unmatched labels are simply
+    # dropped (NOT filed as gaps): "absent from résumé" != "cannot do".
     for label in sorted(taxonomy.keys()):
         meta = taxonomy[label]
         if label in present:
@@ -228,8 +235,6 @@ def build_skills_json(present: set[str], taxonomy: dict) -> dict:
             if meta.get("soft"):
                 entry["soft"] = True
             supported[label] = entry
-        else:
-            unsupported[label] = meta["aliases"]
 
     # Emit ontology-only labels (not in curated taxonomy)
     try:
@@ -275,14 +280,16 @@ def _print_summary(present: set[str], taxonomy: dict, out_path: Path) -> None:
             group = _group_for_summary(label)
         by_group[group].append(label)
 
-    total = len(taxonomy)
     found = len(present)
-    gaps = total - found
     groups = len(by_group)
 
     print(f"\nFound {found} skills on your résumé across {groups} groups -> {out_path}")
     print("REVIEW supported_skills: add any we missed, remove false positives.")
-    print(f"({gaps} taxonomy skills not on your résumé are tracked as gaps.)\n")
+    if found < LOW_SKILL_FLOOR:
+        print(f"Only {found} skills detected — add more detail (tools, methods) "
+              "so more jobs can match.\n")
+    else:
+        print()
 
     for group in sorted(by_group.keys()):
         labels = by_group[group]

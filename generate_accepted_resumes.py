@@ -70,7 +70,7 @@ from config import (  # noqa: E402
     SUPPORTED_TERMS, UNSUPPORTED_TERMS,
     _TERM_PATTERNS, _UNSUPPORTED_PATTERNS,
     _alias_pattern,
-    CONTACT, WORK_RIGHTS, NAME, EDUCATION,
+    CONTACT, WORK_RIGHTS, NAME, EDUCATION, PROJECTS,
 )
 
 def _get_exclude_companies():
@@ -656,7 +656,9 @@ def build_content(target: Dict[str, str], jd_text: str) -> Dict:
         "summary": summary,
         "skills_lines": skills_lines,
         "bullets_by_slot": bullets_by_slot,
-        "projects": projects_for(family),
+        # Real résumé projects win; the generic sample bank is the fallback only
+        # for users who supplied none (never fabricate over real ones).
+        "projects": list(PROJECTS) if PROJECTS else projects_for(family),
     }
 
 
@@ -763,49 +765,84 @@ ACHIEVEMENT_SENTENCES = {
 }
 
 
+def _join_labels(labels: List[str]) -> str:
+    """Render a list as 'A, B and C' (no Oxford comma, no em-dash)."""
+    labels = [l for l in labels if l]
+    if not labels:
+        return ""
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
+def _lc_sentence(s: str) -> str:
+    """Lowercase the first word and drop a trailing period, so a résumé bullet can
+    be embedded mid-sentence ('Built X.' -> 'built X')."""
+    s = s.strip().rstrip(".")
+    return (s[:1].lower() + s[1:]) if s else s
+
+
 def cover_letter_paragraphs(content: Dict, company: str, role: str, jd_text: str) -> List[str]:
+    """Deterministic, real-data cover letter. Draws on the candidate's own
+    JD-matched bullets, real education and real projects - never fabricates."""
     jd_hits = content["jd_hits"]
 
+    # This JD's top requirement labels, by importance.
+    top_labels = [l for l, _ in sorted(jd_hits.items(), key=lambda kv: -importance(kv[1]))][:3]
+
+    # --- p1: role/company + sector hook + the JD's own emphasis ---
     hook = ""
     blob = f"{company} {role} {jd_text}"
     for pattern, sentence in SECTOR_HOOKS:
         if pattern.search(blob):
             hook = " " + sentence
             break
-
     p1 = f"I am applying for the {role} role at {company}.{hook}"
+    if top_labels:
+        p1 += f" The role's focus on {_join_labels(top_labels)} lines up closely with my work."
 
-    ranked = sorted(
-        (l for l in jd_hits if l in ACHIEVEMENT_SENTENCES),
-        key=lambda l: -importance(jd_hits[l]),
-    )
-    sentences = []
-    used_texts: set = set()
-    for label in ranked:
-        s = ACHIEVEMENT_SENTENCES[label]
-        if s not in used_texts:
-            sentences.append(s)
-            used_texts.add(s)
-        if len(sentences) == 2:
-            break
-    if not sentences:
-        sentences = [ACHIEVEMENT_SENTENCES["SQL"]]
-    if len(sentences) == 2:
-        p2 = f"{sentences[0]}. {sentences[1]}."
+    # --- p2: the candidate's own real, JD-selected bullets (truthful, already
+    # linted in build_content), ranked by how many top requirements they evidence ---
+    real_bullets = [b for _, slot in EXPERIENCE_SLOTS for b in content["bullets_by_slot"].get(slot, [])]
+    seen: set = set()
+    real_bullets = [b for b in real_bullets if not (b in seen or seen.add(b))]
+
+    def _coverage(bullet: str) -> int:
+        low = bullet.lower()
+        return sum(1 for lbl in top_labels
+                   if lbl.lower() in low or (jd_hits[lbl].get("alias") or "") in low)
+
+    ranked_bullets = sorted(real_bullets, key=lambda b: (-_coverage(b), real_bullets.index(b)))
+    chosen = [b for b in ranked_bullets if _coverage(b) > 0][:2] or ranked_bullets[:2]
+
+    if chosen:
+        if len(chosen) == 2:
+            p2 = f"In recent work I {_lc_sentence(chosen[0])}. I also {_lc_sentence(chosen[1])}."
+        else:
+            p2 = f"In recent work I {_lc_sentence(chosen[0])}."
     else:
-        p2 = f"{sentences[0]}."
+        # Fallback only when the candidate has no bullets at all.
+        ranked = sorted((l for l in jd_hits if l in ACHIEVEMENT_SENTENCES),
+                        key=lambda l: -importance(jd_hits[l]))
+        sents = [ACHIEVEMENT_SENTENCES[l] for l in ranked[:2]] or [ACHIEVEMENT_SENTENCES["SQL"]]
+        p2 = " ".join(f"{s}." for s in sents)
 
-    p3 = (
-        "I am currently building a cloud-native data pipeline that cleans, enriches and "
-        "structures high-volume source data for analytics use, and I hold a Master of Data Science."
-    )
+    # --- p3: real education + a real project. Omit anything absent; never invent. ---
+    p3 = ""
+    if EDUCATION:
+        edu_short = ", ".join(p.strip() for p in EDUCATION[0].split(",")[:2] if p.strip())
+        if edu_short:
+            p3 = f"I hold {edu_short}."
+    if PROJECTS:  # module global is empty unless the résumé supplied real projects
+        p3 += (" " if p3 else "") + f"Alongside this I built {PROJECTS[0][0]}."
+    if not p3 and content.get("summary"):
+        p3 = content["summary"]
 
+    # --- p4: call to action + work rights ---
     work_rights_line = f" {WORK_RIGHTS}" if WORK_RIGHTS else ""
-    p4 = (
-        f"I would welcome a short call about how I can help {company}'s team.{work_rights_line}"
-    )
+    p4 = f"I would welcome a short call about how I can help {company}'s team.{work_rights_line}"
 
-    paragraphs = [p1, p2, p3, p4]
+    paragraphs = [p for p in (p1, p2, p3, p4) if p]
     for p in paragraphs:
         lint_text(p, "cover letter")
     return paragraphs

@@ -3,7 +3,9 @@
     "name": "Jordan Rivera",
     "contact": "City, Country | you@example.com | open to remote",
     "work_rights": "",
-    "needs_sponsorship": false
+    "needs_sponsorship": false,
+    "years_experience": null,
+    "certifications": []
   },
   "matching": {
     "seniority_cap": null,

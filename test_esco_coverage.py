@@ -50,6 +50,17 @@ def recognized(path: Path):
 class TestEscoCoverage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # ESCO is opt-in now; this suite validates the ESCO-enabled path.
+        cls._prev_esco = os.environ.get("ESCO_DATA")
+        os.environ["ESCO_DATA"] = str(Path(__file__).resolve().parent / "esco" / "skills_en.csv")
+        ontology._reset_cache()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._prev_esco is None:
+            os.environ.pop("ESCO_DATA", None)
+        else:
+            os.environ["ESCO_DATA"] = cls._prev_esco
         ontology._reset_cache()
 
     def test_per_profession_floor(self):

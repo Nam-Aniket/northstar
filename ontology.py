@@ -34,7 +34,7 @@ import unicodedata
 from pathlib import Path
 from typing import Dict, Optional, Set
 
-from matcher import build_automaton, find, _Automaton
+from matcher import build_automaton, find, find_detailed, _Automaton
 
 ROOT = Path(__file__).resolve().parent
 
@@ -129,17 +129,17 @@ def load_alias_map() -> Dict[str, str]:
 
     Curated taxonomy aliases are always overlaid last so they win on conflicts.
     """
-    # Check for ESCO data source
+    # ESCO is OPT-IN. The bundled ESCO dump is a poor fit for resume/JD skill
+    # wording: it carries almost none of the practical tool/method vocabulary,
+    # injects false positives ("obesity", "packaging engineering"), and makes the
+    # automaton build pathologically slow (~1200s). Default to taxonomy-only; set
+    # the ESCO_DATA env var to a CSV path to union ESCO in.
     esco_path: Optional[Path] = None
     env_path = os.environ.get("ESCO_DATA")
     if env_path:
         p = Path(env_path)
         if p.exists():
             esco_path = p
-    if esco_path is None:
-        candidate = ROOT / "esco" / "skills_en.csv"
-        if candidate.exists():
-            esco_path = candidate
 
     if esco_path is not None:
         alias_map = _aliases_from_esco(esco_path)
@@ -175,6 +175,18 @@ def _get_automaton() -> _Automaton:
 def match_text(text: str) -> Set[str]:
     """Return the set of canonical skill labels matched in text."""
     return find(text, _get_automaton())
+
+
+def match_text_detailed(text: str) -> Dict[str, Dict[str, int]]:
+    """Return {label: {"freq": int, "first_pos": int}} over the FULL taxonomy.
+
+    first_pos indexes into the lowercased text — the scorer compares it against
+    the requirements-region anchor to weight region hits higher."""
+    spans = find_detailed(text, _get_automaton())
+    return {
+        label: {"freq": len(hits), "first_pos": min(s for s, _ in hits)}
+        for label, hits in spans.items()
+    }
 
 
 # ---------------------------------------------------------------------------

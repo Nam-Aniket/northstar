@@ -849,6 +849,30 @@ def set_education(lines: list) -> None:
     os.replace(tmp, str(cfg_path))
 
 
+def set_projects(projects: list) -> None:
+    """Atomically update config.json identity.projects from the parsed resume.
+    projects: [[name, [bullets]], ...]."""
+    import config as _config
+
+    cfg_path = _config.ROOT / "config.json"
+    example_path = _config.ROOT / "config.example.json"
+    base_path = cfg_path if cfg_path.exists() else example_path
+    data = {}
+    if base_path.exists():
+        with base_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+
+    ident = data.setdefault("identity", {})
+    if projects:
+        ident["projects"] = projects
+
+    tmp = str(cfg_path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, str(cfg_path))
+
+
 def highlight(text, evidence) -> str:
     """Escape JD text and wrap matched-skill terms in <mark>."""
     text = text or ""

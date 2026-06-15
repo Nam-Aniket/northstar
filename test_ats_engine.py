@@ -199,7 +199,10 @@ class TestAdversarialScorer(unittest.TestCase):
             )
             r = score_job("Data Analyst", jd)
             self.assertLessEqual(r["fit"], 30, f"citizenship JD scored {r['fit']} — expected <= 30")
-            self.assertTrue(any("citizen" in c for c in r["caps"]), "citizenship cap not recorded")
+            # Citizenship is now expressed through the work-authorization knockout.
+            self.assertTrue(any("work authorization" in c for c in r["caps"]),
+                            "work-authorization cap not recorded")
+            self.assertTrue(r["auto_reject_risk"], "work-auth knockout should flag auto-reject risk")
         finally:
             _restore_default_config()
 
@@ -250,6 +253,132 @@ class TestAdversarialScorer(unittest.TestCase):
         self.assertNotIn("SQL", fluff_r["supported"])
         self.assertNotIn("R", fluff_r["supported"])
         self.assertLess(fluff_r["fit"], 50, f"fluff+wordpart JD scored {fluff_r['fit']} — expected < 50")
+
+
+class TestKnockouts(unittest.TestCase):
+    """Knockout / prescreening detection (the only true ATS auto-reject gate)."""
+
+    def _ko(self, jd, role="Data Analyst"):
+        from score_jobs import detect_knockouts, _req_start
+        return detect_knockouts(jd, _req_start(jd))
+
+    def _types(self, jd):
+        return {k["type"] for k in self._ko(jd)}
+
+    def test_min_years_detected_with_value(self):
+        kos = self._ko("Requirements: minimum 5 years of analytics experience.")
+        years = [k for k in kos if k["type"] == "min_years"]
+        self.assertEqual(len(years), 1)
+        self.assertEqual(years[0]["required_value"], 5)
+
+    def test_plus_years_form_detected(self):
+        kos = self._ko("Requirements: 7+ years in a data role.")
+        self.assertEqual([k["required_value"] for k in kos if k["type"] == "min_years"], [7])
+
+    def test_bare_years_is_not_a_knockout(self):
+        # Descriptive prose, not a stated minimum.
+        self.assertNotIn("min_years", self._types(
+            "Requirements: SQL and Python. Our team has grown over the last 5 years."))
+
+    def test_degree_required_detected(self):
+        self.assertIn("degree", self._types(
+            "Requirements: Bachelor's degree in Statistics required."))
+
+    def test_degree_preferred_is_not_a_knockout(self):
+        self.assertNotIn("degree", self._types(
+            "Requirements: Bachelor's degree preferred, or equivalent experience."))
+
+    def test_certification_detected(self):
+        self.assertIn("certification", self._types("Requirements: CPA required."))
+
+    def test_eeo_citizenship_is_not_a_knockout(self):
+        _use_caps_config()
+        try:
+            jd = ("Requirements: SQL and Python. We welcome all regardless of "
+                  "citizenship, gender identity or sexual orientation.")
+            self.assertNotIn("work_authorization", self._types(jd))
+        finally:
+            _restore_default_config()
+
+    def test_onsite_detected_as_verify_only(self):
+        kos = self._ko("Requirements: SQL. This role is 4 days per week in the office.")
+        onsite = [k for k in kos if k["type"] == "onsite"]
+        self.assertEqual(len(onsite), 1)
+        self.assertEqual(onsite[0]["status"], "unknown")  # never an auto-fail
+
+    def test_years_unmet_flags_auto_reject(self):
+        import config
+        config._proxy._load()
+        config._proxy._data["years_experience"] = 2
+        try:
+            r = score_job("Data Analyst",
+                          "Requirements: strong SQL and Python. Minimum 8 years required.")
+            self.assertTrue(r["auto_reject_risk"])
+            self.assertLess(r["fit"], KEEP_THRESHOLD)
+        finally:
+            config._proxy._data.pop("years_experience", None)
+
+    def test_years_unknown_does_not_fail(self):
+        # No candidate years in the example config -> status unknown -> no cap, no flag.
+        r = score_job("Data Analyst",
+                      "Requirements: strong SQL and Python. Minimum 8 years required.")
+        self.assertFalse(r["auto_reject_risk"])
+
+
+class TestSoftWeighting(unittest.TestCase):
+    """Hard/soft weighted coverage: soft skills count at a lower, role-dependent
+    weight, and a manager/senior role penalises unevidenced soft skills more."""
+
+    def test_senior_role_penalises_unevidenced_soft_more(self):
+        # "Leadership" is a soft skill the example bank does NOT evidence (a gap);
+        # SQL/Python are hard skills it has. Only the role seniority differs, so
+        # the score gap is purely the soft weight (IC 0.15 vs senior 0.40).
+        jd = ("Requirements: strong SQL and Python for analysis. "
+              "Proven leadership of a team is essential.")
+        ic = score_job("Data Analyst", jd)
+        snr = score_job("Senior Data Analyst", jd)
+        self.assertLess(snr["fit"], ic["fit"],
+                        f"senior {snr['fit']} should be < IC {ic['fit']} when leadership unevidenced")
+
+    def test_soft_weighting_does_not_inflate_pure_hard_jd(self):
+        # A JD of only hard skills the bank evidences must still clear the keep bar;
+        # the soft term must not change a JD with no soft requirements.
+        jd = "Requirements: SQL, Python, Power BI, Tableau and data modelling."
+        r = score_job("Data Analyst", jd)
+        self.assertGreaterEqual(r["fit"], KEEP_THRESHOLD)
+
+
+class TestStrictTokenR(unittest.TestCase):
+    """Bare 'R' (the language) recognised in skill-list contexts, without the
+    R&D / prose false positives. The Aho-Corasick and regex paths must agree."""
+
+    def test_matcher_regex_parity(self):
+        from matcher import build_automaton, find
+        from config import _alias_pattern
+        auto = build_automaton({"r": "R"})
+        pat = _alias_pattern("r")
+        battery = [
+            "python, r, sql", "r/python", "python/r", "languages: r, python",
+            "r&d team", "(r)", "4(r)", "skilled in r.", "hr analytics",
+            "your team", "r-python", "  r  ", "r", "ml, r, nlp",
+        ]
+        for s in battery:
+            s = s.lower()
+            self.assertEqual("R" in find(s, auto), bool(pat.search(s)),
+                             f"matcher/regex disagree on {s!r}")
+
+    def test_r_recall_in_skill_lists(self):
+        for jd in ["Skills: Python, R, SQL, Tableau",
+                   "Requirements: strong R and Python",
+                   "Languages: R/Python/SQL"]:
+            self.assertIn("R", extract_terms_detailed(jd)[0], f"R missed in {jd!r}")
+        r = score_job("Data Analyst", "Requirements: SQL, Python, R and Tableau for analysis.")
+        self.assertIn("R", r["supported"])
+
+    def test_r_precision_no_false_match(self):
+        for jd in ["Work in our R&D team", "see section 4(r)", "skilled in R.",
+                   "HR analytics role", "bring your skills", "R-Python interop"]:
+            self.assertNotIn("R", extract_terms_detailed(jd)[0], f"R falsely matched in {jd!r}")
 
 
 if __name__ == "__main__":
