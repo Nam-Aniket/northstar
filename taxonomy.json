@@ -264,15 +264,15 @@
     "group": "Data Engineering"
   },
   "Machine Learning": {
-    "aliases": ["machine learning", "ml models", "ml pipeline"],
+    "aliases": ["machine learning", "ml models", "ml pipeline", "ml", "ml classification", "classification models", "scikit", "scikit-learn", "sklearn", "tensorflow", "keras", "pytorch"],
     "group": "Data Science"
   },
   "Deep Learning": {
-    "aliases": ["deep learning", "neural network", "neural networks", "neural net"],
+    "aliases": ["deep learning", "neural network", "neural networks", "neural net", "transformer", "transformers"],
     "group": "Data Science"
   },
   "NLP": {
-    "aliases": ["nlp", "natural language processing", "text analytics", "text mining"],
+    "aliases": ["nlp", "natural language processing", "text analytics", "text mining", "topic modelling", "topic modeling", "keybert", "text summarization", "semantic search", "vector embeddings", "embeddings"],
     "group": "Data Science"
   },
   "Statistical Analysis": {
@@ -288,7 +288,7 @@
     "group": "Data Science"
   },
   "Predictive Analytics": {
-    "aliases": ["predictive analytics", "predictive modelling", "predictive modeling"],
+    "aliases": ["predictive analytics", "predictive modelling", "predictive modeling", "forecasting models", "load forecasting", "load-forecasting", "time series forecasting"],
     "group": "Data Science"
   },
   "Feature Engineering": {

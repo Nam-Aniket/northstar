@@ -217,6 +217,15 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     except Exception:
         pass  # identity write must never break onboarding
 
+    try:
+        _edu_lines = [
+            ", ".join(filter(None, [e.get("degree"), e.get("school"), e.get("year")]))
+            for e in (parsed.get("education") or [])
+        ]
+        queries.set_education(_edu_lines)
+    except Exception:
+        pass  # education write must never break onboarding
+
     con = conn()
     queries.set_resume(con, dest.name, summary)
     state = queries.onboarding_state(con)

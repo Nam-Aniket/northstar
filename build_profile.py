@@ -195,6 +195,25 @@ def build_skills_json(present: set[str], taxonomy: dict) -> dict:
     curated taxonomy labels not matched — the full ontology label universe is
     never materialised there.
     """
+    # Child -> parent roll-up: if a concrete child skill is present, also
+    # promote its umbrella parent so it lands in supported, not unsupported.
+    # Applied before the partition so promoted parents are excluded from
+    # unsupported (config._validate_banks forbids overlap between the two banks).
+    _CHILD_TO_PARENT: dict[str, str] = {
+        "Scikit-learn": "Machine Learning",
+        "TensorFlow": "Machine Learning",
+        "PyTorch": "Machine Learning",
+        "Keras": "Machine Learning",
+        "Topic Modelling": "NLP",
+        "Forecasting": "Predictive Analytics",
+        "Time Series": "Predictive Analytics",
+        "A/B Testing": "Machine Learning",
+    }
+    present = set(present)  # copy so we don't mutate the caller's set
+    for child, parent in _CHILD_TO_PARENT.items():
+        if child in present and parent in taxonomy:
+            present.add(parent)
+
     supported: dict = {}
     unsupported: dict = {}
 

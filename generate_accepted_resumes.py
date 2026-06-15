@@ -70,7 +70,7 @@ from config import (  # noqa: E402
     SUPPORTED_TERMS, UNSUPPORTED_TERMS,
     _TERM_PATTERNS, _UNSUPPORTED_PATTERNS,
     _alias_pattern,
-    CONTACT, WORK_RIGHTS, NAME,
+    CONTACT, WORK_RIGHTS, NAME, EDUCATION,
 )
 
 def _get_exclude_companies():
@@ -717,9 +717,8 @@ def write_resume(content: Dict, path: Path) -> None:
             _add_bullet(doc, bullet)
 
     _add_section(doc, "Education")
-    _add_bullet(doc, "Master of Data Science, State University, 2023 - 2025")
-    _add_bullet(doc, "Bachelor of Engineering, Computer Science, City University, 2016 - 2020")
-    _add_bullet(doc, "Professional Data Analytics Certificate")
+    for _edu_line in EDUCATION:
+        _add_bullet(doc, _edu_line)
 
     doc.save(path)
 
@@ -965,7 +964,7 @@ def ats_self_check(docx_path: Path, content: Dict, priors: Dict[str, List[str]])
 
     title_ok = content["subtitle"].lower() in text_low
 
-    edu_ok = "master of data science" in text_low or "master of" in text_low
+    edu_ok = any(line.lower() in text_low for line in EDUCATION if line.strip()) or "master of" in text_low
 
     quantified = sum(
         1 for p in paragraphs

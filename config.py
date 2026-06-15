@@ -328,10 +328,16 @@ class _ConfigProxy:
             ident = cfg.get("identity", {})
             matching = cfg.get("matching", {})
             search = cfg.get("search", {})
+            _edu_cfg = ident.get("education") or []
             self._data = {
                 "NAME": ident.get("name", "Candidate Name"),
                 "CONTACT": ident.get("contact", ""),
                 "WORK_RIGHTS": ident.get("work_rights", ""),
+                "EDUCATION": _edu_cfg if _edu_cfg else [
+                    "Master of Data Science, State University, 2023 - 2025",
+                    "Bachelor of Engineering, Computer Science, City University, 2016 - 2020",
+                    "Professional Data Analytics Certificate",
+                ],
                 "needs_sponsorship": bool(ident.get("needs_sponsorship", False)),
                 "seniority_cap": matching.get("seniority_cap", None),
                 "generation_enabled": bool(matching.get("generation_enabled", False)),
