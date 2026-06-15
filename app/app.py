@@ -225,7 +225,8 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
             parts = [e.get("degree"), e.get("school"), e.get("year")]
             gpa = (e.get("gpa") or "").strip()
             if gpa:
-                parts.append(f"{(e.get('gpa_label') or 'GPA').strip()} {gpa}")
+                label = (e.get("gpa_label") or "").strip()
+                parts.append(f"{label} {gpa}".strip())  # unlabeled score renders as-is
             return ", ".join(p.strip() for p in parts if p and p.strip())
         _edu_lines = [_edu_line(e) for e in (parsed.get("education") or [])]
         queries.set_education(_edu_lines)

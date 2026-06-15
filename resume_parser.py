@@ -213,7 +213,7 @@ _DATE_RANGE_RE = re.compile(
     re.IGNORECASE,
 )
 # Role – Company  or  Role, Company  in the first portion of a line
-_ROLE_SEP_RE = re.compile(r"(?:\s+[-–|]\s+|\s*,\s*)")
+_ROLE_SEP_RE = re.compile(r"(?:\s+[-–|·•∙│]\s+|\s*,\s*)")
 
 
 def _is_date_only_line(line: str) -> bool:
@@ -228,7 +228,7 @@ def _is_date_only_line(line: str) -> bool:
 
 # Role/company separator: a spaced dash/pipe or the word "at". NOT a bare comma
 # (prose has commas) and NOT any dash (hyphenated words like "cross-functional").
-_HEADER_SEP_RE = re.compile(r"\s+[-–|]\s+|\s+\bat\b\s+")
+_HEADER_SEP_RE = re.compile(r"\s+[-–|·•∙│]\s+|\s+\bat\b\s+")
 # Common bullet-opener verbs (past/gerund). A header's company side never starts
 # with one of these; a line like "...| assigned Jira tickets..." is prose.
 _VERB_LEXICON = frozenset({
@@ -394,6 +394,13 @@ def _extract_projects(block: list[str]) -> list[dict]:
 
 _GPA_RE = re.compile(r"\b(GPA|WAM|CGPA)\b[\s:]*([0-9.]+(?:/[0-9.]+)?)", re.IGNORECASE)
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+# Unlabeled score, e.g. "79/100" or "8.7/10" (years like 2019/2020 excluded by the
+# 1-3 digit numerator). Used only when no GPA/WAM/CGPA label is present.
+_SCORE_RE = re.compile(r"\b(\d{1,3}(?:\.\d+)?)\s*/\s*(100|10|7|4)\b")
+# Field separators inside one résumé line: comma, middot variants, pipe, tab. Real
+# résumés use any of these interchangeably; splitting on all of them keeps
+# degree/school/score from collapsing into one segment.
+_FIELD_SEP_RE = re.compile(r"\s*[,·•∙│|]\s*|\t+")
 
 # Education field separators — used to split a single combined line into
 # degree / school / dates cleanly so the date is never duplicated at render.
@@ -426,25 +433,40 @@ def _normalize_edu_dates(text: str) -> str:
     return "Present" if (span and has_present) else ""
 
 
-def _split_education_line(line: str) -> tuple[str, str, str]:
-    """Split a combined education line into (degree, school, dates). The degree
-    string never contains the school or the dates."""
-    work = _GPA_RE.sub("", line).strip()
+def _score_from(text: str) -> tuple[str, str]:
+    """Return (gpa, label) from a line: labeled GPA/WAM/CGPA first, else a bare
+    score like 79/100 (no label). ('', '') if none."""
+    gm = _GPA_RE.search(text)
+    if gm:
+        return gm.group(2), gm.group(1).upper()
+    sm = _SCORE_RE.search(text)
+    if sm:
+        return sm.group(0).replace(" ", ""), ""  # unlabeled score
+    return "", ""
+
+
+def _split_education_line(line: str) -> tuple[str, str, str, str, str]:
+    """Split a combined education line into (degree, school, dates, gpa, gpa_label).
+    The degree string never contains the school, dates, or score."""
+    gpa, gpa_label = _score_from(line)
+    work = _GPA_RE.sub("", line)
+    work = _SCORE_RE.sub("", work).strip()
     dates = _normalize_edu_dates(work)
     # Remove date tokens so they don't pollute degree/school segments.
     work = _DATE_RANGE_RE.sub("", work)
     work = _MONTH_RE.sub("", work)
     work = re.sub(r"\b(19|20)\d{2}\b", "", work)
-    segments = [s.strip(" -–|") for s in work.split(",")]
+    segments = [s.strip(" -–|·•∙") for s in _FIELD_SEP_RE.split(work)]
     segments = [s for s in segments if s]
     degree = next((s for s in segments if _DEGREE_KEYWORDS.search(s)), "")
-    school = next((s for s in segments if _INSTITUTION_RE.search(s)), "")
+    # school must be a DIFFERENT segment than degree (avoids degree==school dupes).
+    school = next((s for s in segments if s != degree and _INSTITUTION_RE.search(s)), "")
     leftovers = [s for s in segments if s not in (degree, school)]
     if degree and leftovers:
         degree = degree + ", " + ", ".join(leftovers)  # e.g. a major: "..., Computer Science"
     elif not degree:
         degree = segments[0] if segments else ""
-    return degree, school, dates
+    return degree, school, dates, gpa, gpa_label
 
 
 def _extract_education(block: list[str]) -> list[dict]:
@@ -452,39 +474,35 @@ def _extract_education(block: list[str]) -> list[dict]:
     entries: list[dict] = []
     current: dict | None = None
 
-    def _new_entry(degree, school, dates):
-        return {"degree": degree, "school": school, "year": dates, "gpa": "", "gpa_label": ""}
+    def _new_entry(degree, school, dates, gpa, gpa_label):
+        return {"degree": degree, "school": school, "year": dates,
+                "gpa": gpa, "gpa_label": gpa_label}
 
     for line in block:
         stripped = line.strip()
         if not stripped:
             continue
 
-        gpa_m = _GPA_RE.search(stripped)
         is_degree_line = bool(_DEGREE_KEYWORDS.search(stripped))
 
         if is_degree_line:
             if current is not None:
                 entries.append(current)
-            degree, school, dates = _split_education_line(stripped)
-            current = _new_entry(degree, school, dates)
-            if gpa_m:
-                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
+            current = _new_entry(*_split_education_line(stripped))
         elif current is not None:
-            # Subsequent lines of a two-line layout: school, then dates, then gpa.
+            # Subsequent lines of a two-line layout: school, then dates, then score.
+            gpa, gpa_label = _score_from(stripped)
             dates = _normalize_edu_dates(stripped)
-            if gpa_m and not current["gpa"]:
-                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
+            if gpa and not current["gpa"]:
+                current["gpa"], current["gpa_label"] = gpa, gpa_label
             elif dates and not current["year"]:
                 current["year"] = dates
             elif not current["school"] and not dates:
                 current["school"] = stripped
         else:
             # No current entry yet — start a bare entry from the line.
-            degree, school, dates = _split_education_line(stripped)
-            current = _new_entry(degree or stripped, school, dates)
-            if gpa_m:
-                current["gpa_label"], current["gpa"] = gpa_m.group(1).upper(), gpa_m.group(2)
+            degree, school, dates, gpa, gpa_label = _split_education_line(stripped)
+            current = _new_entry(degree or stripped, school, dates, gpa, gpa_label)
 
     if current is not None:
         entries.append(current)

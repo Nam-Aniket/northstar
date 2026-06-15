@@ -23,7 +23,8 @@ def _edu_line(e):
     parts = [e.get("degree"), e.get("school"), e.get("year")]
     gpa = (e.get("gpa") or "").strip()
     if gpa:
-        parts.append(f"{(e.get('gpa_label') or 'GPA').strip()} {gpa}")
+        label = (e.get("gpa_label") or "").strip()
+        parts.append(f"{label} {gpa}".strip())
     return ", ".join(p.strip() for p in parts if p and p.strip())
 
 
@@ -85,6 +86,21 @@ class TestEducation(unittest.TestCase):
             edu = _extract_education(["Bachelor of Science, City University, 2016 - 2019", raw])
             self.assertEqual(edu[0]["gpa"], num)
             self.assertEqual(edu[0]["gpa_label"], label)
+
+    def test_middot_separators_no_duplication(self):
+        # Real-résumé format using middot field separators + an unlabeled score.
+        edu = _extract_education(
+            ["Bachelor of Computer Applications · MP University · 79/100 · 2019 - 2022"]
+        )
+        self.assertEqual(len(edu), 1)
+        e = edu[0]
+        self.assertEqual(e["degree"], "Bachelor of Computer Applications")
+        self.assertEqual(e["school"], "MP University")
+        self.assertEqual(e["year"], "2019 - 2022")
+        self.assertEqual(e["gpa"], "79/100")
+        self.assertNotEqual(e["degree"], e["school"])  # the duplication bug
+        self.assertEqual(_edu_line(e),
+                         "Bachelor of Computer Applications, MP University, 2019 - 2022, 79/100")
 
     def test_no_em_dash_in_composed_date(self):
         edu = _extract_education(["Master of Data Science, Monash University, Feb 2024 – Dec 2025"])
