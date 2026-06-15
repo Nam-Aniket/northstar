@@ -183,7 +183,11 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     # Parse résumé into the Builder schema and cache for prefill
     try:
         from resume_parser import parse_resume, save_parsed
-        parsed = parse_resume(resume_text, use_llm=bool(os.environ.get("LLM_API_KEY")))
+        # Deterministic parse only. The LLM overlay made a slow (up to 60s) network
+        # call that blocked the entire upload response and caused the "takes minutes"
+        # lag. Onboarding only needs name/contact + skills + facts, all derivable
+        # without the LLM; Builder AI-write still uses it on demand.
+        parsed = parse_resume(resume_text, use_llm=False)
         save_parsed(parsed, UPLOADS_DIR)
         n_roles = len(parsed.get("experiences") or [])
         if n_roles:
