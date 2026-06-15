@@ -150,7 +150,7 @@ class TestOntologyFallback(unittest.TestCase):
         """group_for returns correct group from taxonomy."""
         from ontology import group_for
         self.assertEqual(group_for("SQL"), "Programming")
-        self.assertEqual(group_for("Power BI"), "Data & BI")
+        self.assertEqual(group_for("Power BI"), "Analytics & BI")
 
     def test_group_for_unknown_label(self):
         """group_for returns 'General' for labels not in taxonomy."""
