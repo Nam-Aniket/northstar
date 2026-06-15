@@ -207,8 +207,36 @@ def main() -> None:
             )
             return
 
-        run_status.write(stage="done", pct=100, message="Up to date", ok=True, finished_at=_now())
-        _log(f"=== SUCCESS : {total} postings synced, {scored} scored onto the board ===")
+        # Resume-generation visibility. The generate stage silently no-ops in two
+        # cases, which previously hid "no resumes were created" behind a SUCCESS
+        # line — non-technical users never noticed. Surface the reason.
+        import config as _cfg
+        no_resume_reason = None
+        if not _cfg.generation_enabled:
+            no_resume_reason = (
+                "resume generation is OFF",
+                ['Set  "generation_enabled": true  under "matching" in config.json,',
+                 "then run again."],
+            )
+        elif _cfg.load_facts_override() is None:
+            no_resume_reason = (
+                "no resume data found",
+                ["Upload your resume in onboarding so tailored resumes can be built",
+                 "from your real experience, then run again."],
+            )
+        done_msg = "Up to date (no resumes - see log)" if no_resume_reason else "Up to date"
+        run_status.write(stage="done", pct=100, message=done_msg, ok=True, finished_at=_now())
+        if no_resume_reason:
+            why, how = no_resume_reason
+            _log("")
+            _log("!" * 60)
+            _log(f"[!] NO RESUMES GENERATED - {why}.")
+            _log("    No tailored resume or cover letter was created for any job.")
+            for line in how:
+                _log("    " + line)
+            _log("!" * 60)
+        tail = " | NO resumes (see above)" if no_resume_reason else ""
+        _log(f"=== SUCCESS : {total} postings synced, {scored} scored onto the board{tail} ===")
 
     finally:
         run_status.release_lock()

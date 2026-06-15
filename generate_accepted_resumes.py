@@ -1234,9 +1234,17 @@ def main() -> None:
         _main_single(args.row_key)
         return
 
-    # Batch path — gated by generation_enabled as before.
-    if not config.generation_enabled or not FACT_BANK:
-        print("Resume generation is OFF for this profile (v1 ships matching only). Enable it in config.json.")
+    # Batch path. Generation is ON by default; two cases skip it:
+    #   1. explicitly disabled in config.json
+    #   2. no real facts.json yet — building from the placeholder "Company A/B/C"
+    #      fact bank would hand the user a resume full of fake employers, which is
+    #      worse than none. Onboarding writes facts.json from the parsed résumé.
+    if not config.generation_enabled:
+        print("Resume generation is OFF for this profile. Enable it in config.json (matching.generation_enabled).")
+        return
+    if _facts_override is None:
+        print("Resume generation is ON but no resume data found. Upload your resume in onboarding "
+              "to generate tailored resumes (skipping - will not build from placeholder data).")
         return
     validate_fact_bank()
     OUT_ROOT.mkdir(exist_ok=True)
