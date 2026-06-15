@@ -1,0 +1,15 @@
+<div class="flex flex-col gap-1.5">
+  <label class="filter-label">State or region</label>
+  <select name="state"
+          class="filter-select"
+          hx-get="/onboarding/location/cities"
+          hx-trigger="change"
+          hx-target="#loc-city-wrap"
+          hx-include="[name=country],this">
+    <option value="">All of {{ country }}</option>
+    {% for s in states %}
+    <option value="{{ s }}">{{ s }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div id="loc-city-wrap"></div>

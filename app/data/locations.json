@@ -1,0 +1,266 @@
+{
+  "countries": [
+    {
+      "name": "Australia",
+      "states": [
+        {
+          "name": "Victoria",
+          "cities": ["Melbourne", "Geelong", "Ballarat", "Bendigo", "Shepparton", "Mildura", "Wodonga", "Warrnambool"]
+        },
+        {
+          "name": "New South Wales",
+          "cities": ["Sydney", "Newcastle", "Wollongong", "Central Coast", "Maitland", "Wagga Wagga", "Albury", "Port Macquarie", "Tamworth", "Coffs Harbour", "Broken Hill"]
+        },
+        {
+          "name": "Queensland",
+          "cities": ["Brisbane", "Gold Coast", "Sunshine Coast", "Townsville", "Cairns", "Toowoomba", "Rockhampton", "Mackay", "Bundaberg", "Hervey Bay"]
+        },
+        {
+          "name": "Western Australia",
+          "cities": ["Perth", "Fremantle", "Mandurah", "Bunbury", "Geraldton", "Kalgoorlie", "Albany", "Broome"]
+        },
+        {
+          "name": "South Australia",
+          "cities": ["Adelaide", "Mount Gambier", "Whyalla", "Murray Bridge", "Port Augusta", "Port Lincoln", "Port Pirie"]
+        },
+        {
+          "name": "Tasmania",
+          "cities": ["Hobart", "Launceston", "Devonport", "Burnie"]
+        },
+        {
+          "name": "Australian Capital Territory",
+          "cities": ["Canberra"]
+        },
+        {
+          "name": "Northern Territory",
+          "cities": ["Darwin", "Alice Springs", "Katherine", "Palmerston"]
+        }
+      ]
+    },
+    {
+      "name": "New Zealand",
+      "states": [
+        {
+          "name": "Auckland",
+          "cities": ["Auckland", "Manukau", "North Shore", "Waitakere", "Papakura"]
+        },
+        {
+          "name": "Wellington",
+          "cities": ["Wellington", "Lower Hutt", "Upper Hutt", "Porirua"]
+        },
+        {
+          "name": "Canterbury",
+          "cities": ["Christchurch", "Rolleston", "Selwyn"]
+        },
+        {
+          "name": "Waikato",
+          "cities": ["Hamilton", "Cambridge", "Te Awamutu"]
+        },
+        {
+          "name": "Bay of Plenty",
+          "cities": ["Tauranga", "Rotorua", "Whakatane"]
+        },
+        {
+          "name": "Otago",
+          "cities": ["Dunedin", "Queenstown"]
+        },
+        {
+          "name": "Manawatu-Whanganui",
+          "cities": ["Palmerston North", "Whanganui"]
+        },
+        {
+          "name": "Northland",
+          "cities": ["Whangarei", "Kerikeri"]
+        },
+        {
+          "name": "Hawke's Bay",
+          "cities": ["Napier", "Hastings"]
+        },
+        {
+          "name": "Nelson-Tasman",
+          "cities": ["Nelson", "Richmond"]
+        }
+      ]
+    },
+    {
+      "name": "United Kingdom",
+      "states": [
+        {
+          "name": "England",
+          "cities": ["London", "Birmingham", "Manchester", "Leeds", "Sheffield", "Liverpool", "Bristol", "Coventry", "Leicester", "Bradford", "Nottingham", "Newcastle upon Tyne", "Reading", "Oxford", "Cambridge", "Brighton", "Southampton", "Portsmouth", "Milton Keynes", "Derby", "Stoke-on-Trent", "York", "Exeter", "Norwich", "Ipswich", "Luton", "Bournemouth"]
+        },
+        {
+          "name": "Scotland",
+          "cities": ["Edinburgh", "Glasgow", "Aberdeen", "Dundee", "Inverness", "Stirling", "Perth"]
+        },
+        {
+          "name": "Wales",
+          "cities": ["Cardiff", "Swansea", "Newport", "Bangor", "St Davids"]
+        },
+        {
+          "name": "Northern Ireland",
+          "cities": ["Belfast", "Derry", "Lisburn", "Armagh"]
+        }
+      ]
+    },
+    {
+      "name": "Canada",
+      "states": [
+        {
+          "name": "Ontario",
+          "cities": ["Toronto", "Ottawa", "Mississauga", "Hamilton", "Brampton", "London", "Markham", "Vaughan", "Kitchener", "Windsor", "Waterloo", "Oakville", "Barrie", "Sudbury", "Kingston"]
+        },
+        {
+          "name": "British Columbia",
+          "cities": ["Vancouver", "Surrey", "Burnaby", "Richmond", "Kelowna", "Abbotsford", "Victoria", "Coquitlam", "Langley", "Saanich"]
+        },
+        {
+          "name": "Quebec",
+          "cities": ["Montreal", "Quebec City", "Laval", "Gatineau", "Longueuil", "Sherbrooke", "Saguenay", "Levis", "Trois-Rivieres"]
+        },
+        {
+          "name": "Alberta",
+          "cities": ["Calgary", "Edmonton", "Red Deer", "Lethbridge", "St. Albert", "Medicine Hat", "Grande Prairie"]
+        },
+        {
+          "name": "Manitoba",
+          "cities": ["Winnipeg", "Brandon", "Steinbach"]
+        },
+        {
+          "name": "Saskatchewan",
+          "cities": ["Saskatoon", "Regina", "Prince Albert", "Moose Jaw"]
+        },
+        {
+          "name": "Nova Scotia",
+          "cities": ["Halifax", "Dartmouth", "Truro", "Sydney"]
+        },
+        {
+          "name": "New Brunswick",
+          "cities": ["Fredericton", "Moncton", "Saint John"]
+        },
+        {
+          "name": "Newfoundland and Labrador",
+          "cities": ["St. John's", "Corner Brook"]
+        },
+        {
+          "name": "Prince Edward Island",
+          "cities": ["Charlottetown", "Summerside"]
+        }
+      ]
+    },
+    {
+      "name": "United States",
+      "states": [
+        {
+          "name": "California",
+          "cities": ["Los Angeles", "San Francisco", "San Diego", "San Jose", "Sacramento", "Oakland", "Fresno", "Long Beach", "Bakersfield", "Anaheim", "Santa Ana", "Riverside", "Irvine", "Palo Alto", "Santa Monica", "Berkeley", "Pasadena"]
+        },
+        {
+          "name": "New York",
+          "cities": ["New York City", "Buffalo", "Rochester", "Yonkers", "Syracuse", "Albany", "New Rochelle", "Mount Vernon", "Schenectady", "Utica"]
+        },
+        {
+          "name": "Texas",
+          "cities": ["Houston", "San Antonio", "Dallas", "Austin", "Fort Worth", "El Paso", "Arlington", "Corpus Christi", "Plano", "Laredo", "Irving", "Lubbock", "Garland"]
+        },
+        {
+          "name": "Florida",
+          "cities": ["Jacksonville", "Miami", "Tampa", "Orlando", "St. Petersburg", "Hialeah", "Tallahassee", "Fort Lauderdale", "Port St. Lucie", "Cape Coral", "Pembroke Pines", "Boca Raton"]
+        },
+        {
+          "name": "Illinois",
+          "cities": ["Chicago", "Aurora", "Naperville", "Joliet", "Rockford", "Springfield", "Peoria", "Elgin", "Waukegan", "Champaign"]
+        },
+        {
+          "name": "Washington",
+          "cities": ["Seattle", "Spokane", "Tacoma", "Vancouver", "Bellevue", "Kirkland", "Redmond", "Renton", "Everett"]
+        },
+        {
+          "name": "Massachusetts",
+          "cities": ["Boston", "Worcester", "Springfield", "Cambridge", "Lowell", "Brockton", "New Bedford", "Quincy", "Lynn", "Fall River"]
+        },
+        {
+          "name": "Georgia",
+          "cities": ["Atlanta", "Augusta", "Columbus", "Macon", "Savannah", "Athens", "Sandy Springs", "Roswell", "Albany"]
+        },
+        {
+          "name": "North Carolina",
+          "cities": ["Charlotte", "Raleigh", "Greensboro", "Durham", "Winston-Salem", "Fayetteville", "Cary", "Wilmington", "High Point", "Asheville"]
+        },
+        {
+          "name": "Colorado",
+          "cities": ["Denver", "Colorado Springs", "Aurora", "Fort Collins", "Lakewood", "Thornton", "Arvada", "Westminster", "Boulder", "Pueblo"]
+        },
+        {
+          "name": "Arizona",
+          "cities": ["Phoenix", "Tucson", "Mesa", "Chandler", "Scottsdale", "Glendale", "Gilbert", "Tempe", "Peoria", "Surprise"]
+        },
+        {
+          "name": "Ohio",
+          "cities": ["Columbus", "Cleveland", "Cincinnati", "Toledo", "Akron", "Dayton", "Parma", "Canton", "Youngstown"]
+        },
+        {
+          "name": "Virginia",
+          "cities": ["Virginia Beach", "Norfolk", "Chesapeake", "Richmond", "Newport News", "Alexandria", "Roanoke", "Hampton", "Arlington"]
+        },
+        {
+          "name": "Michigan",
+          "cities": ["Detroit", "Grand Rapids", "Warren", "Sterling Heights", "Ann Arbor", "Lansing", "Flint", "Dearborn", "Livonia", "Westland"]
+        },
+        {
+          "name": "Oregon",
+          "cities": ["Portland", "Salem", "Eugene", "Gresham", "Hillsboro", "Beaverton", "Bend", "Medford", "Springfield"]
+        }
+      ]
+    },
+    {
+      "name": "India",
+      "states": [
+        {
+          "name": "Maharashtra",
+          "cities": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad", "Thane", "Navi Mumbai", "Solapur"]
+        },
+        {
+          "name": "Karnataka",
+          "cities": ["Bengaluru", "Mysuru", "Hubballi", "Mangaluru", "Belagavi", "Davangere"]
+        },
+        {
+          "name": "Delhi",
+          "cities": ["New Delhi", "Delhi", "Noida", "Gurugram", "Faridabad", "Ghaziabad"]
+        },
+        {
+          "name": "Tamil Nadu",
+          "cities": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli"]
+        },
+        {
+          "name": "Telangana",
+          "cities": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar"]
+        },
+        {
+          "name": "West Bengal",
+          "cities": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri"]
+        },
+        {
+          "name": "Gujarat",
+          "cities": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar"]
+        },
+        {
+          "name": "Rajasthan",
+          "cities": ["Jaipur", "Jodhpur", "Kota", "Bikaner", "Ajmer", "Udaipur"]
+        },
+        {
+          "name": "Uttar Pradesh",
+          "cities": ["Lucknow", "Kanpur", "Agra", "Varanasi", "Meerut", "Allahabad", "Ghaziabad", "Noida"]
+        },
+        {
+          "name": "Punjab",
+          "cities": ["Chandigarh", "Ludhiana", "Amritsar", "Jalandhar", "Patiala"]
+        }
+      ]
+    },
+    {
+      "name": "Singapore",
+      "states": []
+    }
+  ]
+}

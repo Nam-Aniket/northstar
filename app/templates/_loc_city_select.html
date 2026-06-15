@@ -1,0 +1,10 @@
+<div class="flex flex-col gap-1.5">
+  <label class="filter-label">City</label>
+  <select name="city"
+          class="filter-select">
+    <option value="">All of {{ state }}</option>
+    {% for c in cities %}
+    <option value="{{ c }}">{{ c }}</option>
+    {% endfor %}
+  </select>
+</div>

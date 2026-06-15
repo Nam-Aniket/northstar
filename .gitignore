@@ -11,7 +11,7 @@ gmail_oauth_client.json
 gmail_oauth_token.json
 
 # --- runtime data & outputs (PII / scraped content) ---
-data/
+/data/
 drafts/
 resumes/
 .crawler_cache/

@@ -734,6 +734,22 @@ def add_locations(con, raw: str) -> None:
     write_config(con)
 
 
+def add_structured_location(con, country: str, state: str, city: str) -> None:
+    """Insert a structured country/state/city location if valid, then write config."""
+    import app.locations as _loc
+    if not _loc.validate(country, state, city):
+        return
+    name = _loc.build_key(country, state, city)
+    display = _loc.build_query(country, state, city)
+    now = _now()
+    con.execute(
+        "INSERT OR IGNORE INTO tracked_locations(name, display, created_at) VALUES(?,?,?)",
+        (name, display, now),
+    )
+    con.commit()
+    write_config(con)
+
+
 def remove_location(con, name: str) -> None:
     con.execute("DELETE FROM tracked_locations WHERE name=?", (name,))
     con.commit()

@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import db, queries
+from app import db, locations as app_locations, queries
 
 ROOT = Path(__file__).resolve().parent.parent
 RESUME_DIR = ROOT / "resumes"
@@ -125,7 +125,8 @@ def onboarding_page(request: Request):
     con.close()
     return templates.TemplateResponse(request, "onboarding.html",
                                       {"state": state, "onb": onb, "positions": positions,
-                                       "locations": locations})
+                                       "locations": locations,
+                                       "countries": app_locations.countries()})
 
 
 @app.post("/onboarding/resume", response_class=HTMLResponse)
@@ -225,7 +226,8 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     con.close()
     return templates.TemplateResponse(request, "_ob_steps.html",
                                       {"state": state, "onb": onb,
-                                       "positions": positions, "locations": locations})
+                                       "positions": positions, "locations": locations,
+                                       "countries": app_locations.countries()})
 
 
 @app.post("/onboarding/resume/delete", response_class=HTMLResponse)
@@ -246,7 +248,8 @@ def onboarding_resume_delete(request: Request):
     con.close()
     return templates.TemplateResponse(request, "_ob_steps.html",
                                       {"state": state, "onb": onb,
-                                       "positions": positions, "locations": locations})
+                                       "positions": positions, "locations": locations,
+                                       "countries": app_locations.countries()})
 
 
 @app.get("/onboarding/resume/download")
@@ -279,7 +282,8 @@ def onboarding_add_positions(request: Request, titles: str = Form("")):
     con.close()
     return templates.TemplateResponse(request, "_ob_steps.html",
                                       {"state": state, "onb": onb,
-                                       "positions": positions, "locations": locations})
+                                       "positions": positions, "locations": locations,
+                                       "countries": app_locations.countries()})
 
 
 @app.post("/onboarding/positions/delete", response_class=HTMLResponse)
@@ -293,16 +297,41 @@ def onboarding_delete_position(request: Request, title: str = Form(...)):
     con.close()
     return templates.TemplateResponse(request, "_ob_steps.html",
                                       {"state": state, "onb": onb,
-                                       "positions": positions, "locations": locations})
+                                       "positions": positions, "locations": locations,
+                                       "countries": app_locations.countries()})
 
 
 @app.post("/onboarding/location", response_class=HTMLResponse)
-def onboarding_add_locations(request: Request, names: str = Form("")):
+def onboarding_add_locations(
+    request: Request,
+    country: str = Form(""),
+    state: str = Form(""),
+    city: str = Form(""),
+):
     con = conn()
-    queries.add_locations(con, names)
+    queries.add_structured_location(con, country, state, city)
     locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_locations.html", {"locations": locations})
+    return templates.TemplateResponse(
+        request, "_locations.html",
+        {"locations": locations, "countries": app_locations.countries()},
+    )
+
+
+@app.get("/onboarding/location/states", response_class=HTMLResponse)
+def onboarding_location_states(request: Request, country: str = ""):
+    return templates.TemplateResponse(
+        request, "_loc_state_select.html",
+        {"states": app_locations.states(country), "country": country},
+    )
+
+
+@app.get("/onboarding/location/cities", response_class=HTMLResponse)
+def onboarding_location_cities(request: Request, country: str = "", state: str = ""):
+    return templates.TemplateResponse(
+        request, "_loc_city_select.html",
+        {"cities": app_locations.cities(country, state), "state": state},
+    )
 
 
 @app.post("/onboarding/location/delete", response_class=HTMLResponse)
@@ -311,7 +340,10 @@ def onboarding_delete_location(request: Request, name: str = Form(...)):
     queries.remove_location(con, name)
     locations = queries.list_locations(con)
     con.close()
-    return templates.TemplateResponse(request, "_locations.html", {"locations": locations})
+    return templates.TemplateResponse(
+        request, "_locations.html",
+        {"locations": locations, "countries": app_locations.countries()},
+    )
 
 
 @app.post("/onboarding/recency")
