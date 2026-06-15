@@ -7,7 +7,7 @@
   },
   "matching": {
     "seniority_cap": null,
-    "generation_enabled": false,
+    "generation_enabled": true,
     "keep_threshold": 45,
     "strong_threshold": 68,
     "exclude_companies": []

@@ -199,6 +199,19 @@ async def onboarding_resume_upload(request: Request, file: UploadFile = File(...
     except Exception:
         pass  # facts build failure must never break onboarding
 
+    # Copy the parsed identity into config.json so generated resumes carry the real
+    # name/contact instead of the shipped "Jordan Rivera" placeholder.
+    try:
+        _contact = " | ".join(p for p in [
+            (parsed.get("location") or "").strip(),
+            (parsed.get("email") or "").strip(),
+            (parsed.get("phone") or "").strip(),
+            (parsed.get("linkedin") or "").strip(),
+        ] if p)
+        queries.set_identity((parsed.get("name") or "").strip(), _contact)
+    except Exception:
+        pass  # identity write must never break onboarding
+
     con = conn()
     queries.set_resume(con, dest.name, summary)
     state = queries.onboarding_state(con)

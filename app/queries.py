@@ -154,11 +154,21 @@ def sectors(con) -> list[dict]:
 def stats(con) -> dict:
     g = lambda s, *a: con.execute(s, a).fetchone()[0]
     total = g("SELECT COUNT(*) FROM jobs WHERE match_score IS NOT NULL")
-    applied = g("SELECT COUNT(*) FROM app_state WHERE applied_at IS NOT NULL")
-    dismissed = g("SELECT COUNT(*) FROM app_state WHERE dismissed = 1")
-    starred = g("SELECT COUNT(*) FROM app_state WHERE starred = 1")
+    # Count app-state marks only among currently-scored jobs, so stale marks left by
+    # a previous dataset (different row_keys) can't skew the counters - otherwise
+    # To review clamps to 0 when old applied/dismissed totals exceed today's scored set.
+    applied = g("""SELECT COUNT(*) FROM jobs j JOIN app_state s ON j.row_key = s.row_key
+                   WHERE j.match_score IS NOT NULL AND s.applied_at IS NOT NULL""")
+    dismissed = g("""SELECT COUNT(*) FROM jobs j JOIN app_state s ON j.row_key = s.row_key
+                     WHERE j.match_score IS NOT NULL AND s.dismissed = 1""")
+    starred = g("""SELECT COUNT(*) FROM jobs j JOIN app_state s ON j.row_key = s.row_key
+                   WHERE j.match_score IS NOT NULL AND s.starred = 1""")
+    to_review = g("""SELECT COUNT(*) FROM jobs j
+                     LEFT JOIN app_state s ON j.row_key = s.row_key
+                     WHERE j.match_score IS NOT NULL
+                       AND COALESCE(s.applied_at, '') = '' AND COALESCE(s.dismissed, 0) = 0""")
     return {"total": total, "applied": applied, "dismissed": dismissed,
-            "starred": starred, "to_review": max(total - applied - dismissed, 0)}
+            "starred": starred, "to_review": to_review}
 
 
 def _ensure(con, row_key):
@@ -765,6 +775,33 @@ def write_config(con) -> None:
     if locations:
         search["target_location"] = locations[0]
     search["recency_tpr"] = tpr
+
+    tmp = str(cfg_path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, str(cfg_path))
+
+
+def set_identity(name: str, contact: str) -> None:
+    """Atomically update config.json identity.name / identity.contact from the parsed
+    resume, so generated resumes carry the real candidate details instead of the
+    shipped placeholder. Reads config.json (or config.example.json on first run)."""
+    import config as _config
+
+    cfg_path = _config.ROOT / "config.json"
+    example_path = _config.ROOT / "config.example.json"
+    base_path = cfg_path if cfg_path.exists() else example_path
+    data = {}
+    if base_path.exists():
+        with base_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+
+    ident = data.setdefault("identity", {})
+    if name:
+        ident["name"] = name
+    if contact:
+        ident["contact"] = contact
 
     tmp = str(cfg_path) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
