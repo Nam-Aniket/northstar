@@ -217,5 +217,36 @@ class TestBuildFacts(unittest.TestCase):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+class TestNoPlaceholderBullets(unittest.TestCase):
+    """A merged experience that carries real bullets must never get a
+    'Contributed to ...' filler bullet (the slop the two-line-header merge in
+    the parser exists to prevent)."""
+
+    def test_no_contributed_to_filler(self):
+        parsed = {
+            "name": "Test Candidate", "email": "", "phone": "", "location": "",
+            "linkedin": "", "summary": "", "skills": "",
+            "experiences": [
+                {
+                    "role": "Data Analytics Intern",
+                    "company": "Cultural Infusion, Melbourne, Australia",
+                    "dates": "Feb 2026 - Present",
+                    "bullets": [
+                        "Built SQL dashboards for operational reporting.",
+                        "Automated Python pipelines for monthly reconciliation.",
+                    ],
+                },
+            ],
+            "education": [],
+        }
+        facts = build_facts(parsed)
+        for slot_key, pool in facts["FACT_BANK"].items():
+            for entry in pool:
+                self.assertNotIn(
+                    "Contributed to", entry["text"],
+                    f"Slot {slot_key!r} got a placeholder bullet: {entry['text']!r}",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

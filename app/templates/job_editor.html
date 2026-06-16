@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+{% block title %}Tailor · {{ j.role_title }} · {{ j.company }}{% endblock %}
+
+{% block content %}
+<a href="/jobs/{{ j.row_key|urlk }}" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-clay transition-colors mb-4">
+  <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back to job
+</a>
+
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="page-h">Tailor &amp; edit</h1>
+    <p class="page-sub">{{ j.role_title }} at {{ j.company }} - the preview updates live. Claim a missing skill to re-score, then download.</p>
+  </div>
+</div>
+
+{# Hidden download form - native browser POST so the .zip saves directly #}
+<form id="dl-form" method="post" action="/jobs/{{ j.row_key|urlk }}/download" style="display:none">
+  <input type="hidden" name="payload" id="payload">
+  <input type="hidden" name="cover" id="cover-payload">
+</form>
+
+<div class="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-5 items-start">
+
+  {# ── LEFT: fit panel + form ──────────────────────────────────────────────── #}
+  <div class="flex flex-col gap-5">
+
+    {# Match fit + claimable gaps - the live re-score lives here #}
+    <div class="panel p-5">
+      <h2 class="section-h mb-3">Match fit</h2>
+      {% include "_job_fit.html" %}
+    </div>
+
+    <div class="panel p-5 flex flex-col gap-5">
+      {# Contact #}
+      <div>
+        <h2 class="section-h mb-3">Contact</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="filter-label" for="f-name">Full name</label>
+            <input id="f-name" class="filter-select" type="text" autocomplete="name"></div>
+          <div><label class="filter-label" for="f-email">Email</label>
+            <input id="f-email" class="filter-select" type="email" autocomplete="email"></div>
+          <div><label class="filter-label" for="f-phone">Phone</label>
+            <input id="f-phone" class="filter-select" type="text" autocomplete="tel"></div>
+          <div><label class="filter-label" for="f-location">Location</label>
+            <input id="f-location" class="filter-select" type="text" autocomplete="address-level2"></div>
+          <div class="col-span-2"><label class="filter-label" for="f-linkedin">LinkedIn URL</label>
+            <input id="f-linkedin" class="filter-select" type="url"></div>
+        </div>
+      </div>
+
+      {# Summary #}
+      <div>
+        <h2 class="section-h mb-3">Summary</h2>
+        <textarea id="f-summary" class="filter-select" rows="3"></textarea>
+      </div>
+
+      {# Experience #}
+      <div>
+        <h2 class="section-h mb-1">Experience</h2>
+        <div id="exp-list" class="flex flex-col gap-4"></div>
+        <button type="button" id="add-exp" class="btn-open mt-3 w-full justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add experience
+        </button>
+      </div>
+
+      {# Projects #}
+      <div>
+        <h2 class="section-h mb-1">Projects</h2>
+        <div id="proj-list" class="flex flex-col gap-4"></div>
+        <button type="button" id="add-proj" class="btn-open mt-3 w-full justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add project
+        </button>
+      </div>
+
+      {# Skills #}
+      <div>
+        <h2 class="section-h mb-3">Skills</h2>
+        <label class="filter-label" for="f-skills">Comma-separated</label>
+        <textarea id="f-skills" class="filter-select" rows="2"></textarea>
+      </div>
+
+      {# Education #}
+      <div>
+        <h2 class="section-h mb-1">Education</h2>
+        <div id="edu-list" class="flex flex-col gap-3"></div>
+        <button type="button" id="add-edu" class="btn-open mt-3 w-full justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add education
+        </button>
+      </div>
+
+      {# Cover letter #}
+      <div>
+        <h2 class="section-h mb-1">Cover letter</h2>
+        <p class="text-xs text-muted mb-2">One paragraph per block, separated by a blank line. Grounded in your real data - edit freely.</p>
+        <textarea id="f-cover" class="filter-select" rows="10" style="resize:vertical"></textarea>
+      </div>
+    </div>
+  </div>{# /left #}
+
+  {# ── RIGHT: preview pane ─────────────────────────────────────────────────── #}
+  <div class="lg:sticky lg:top-24">
+    <div class="panel overflow-hidden">
+      {# Toolbar #}
+      <div class="flex items-center justify-between gap-3 px-5 py-3 border-b flex-wrap" style="border-color:rgb(var(--c-line))">
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Resume preview</span>
+          <span id="page-count-badge" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;line-height:1.6"></span>
+        </div>
+        <button type="button" id="download-btn" class="btn-apply">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download .zip
+        </button>
+      </div>
+
+      {# Live keyword coverage meter (resume vs this JD) #}
+      <div id="cov-wrap" class="px-5 py-3 border-b" style="border-color:rgb(var(--c-line));display:none">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="tip text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Keyword coverage<span role="tooltip" class="tip__bubble">Share of this job's recognised skill terms that appear in your resume text. A quick ATS-style signal - it rises as you add matching skills and bullets.</span></span>
+          <span id="cov-pct" class="text-xs font-semibold">0%</span>
+        </div>
+        <div style="height:8px;border-radius:20px;background:rgb(var(--c-line));overflow:hidden">
+          <div id="cov-bar" style="height:100%;width:0%;border-radius:20px;transition:width .35s ease,background .35s ease"></div>
+        </div>
+      </div>
+
+      {# Paper scroll container #}
+      <div id="paper-scroll" data-lenis-prevent style="background:rgb(var(--c-sand));padding:28px;max-height:calc(100vh - 230px);overflow-y:auto;overflow-x:hidden">
+        <div id="paper-scaler" style="transform-origin:top center;margin:0 auto">
+          <div id="preview-paper"
+            style="position:relative;background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:10.5pt;
+                   line-height:1.45;padding:76px;width:794px;min-height:1122px;box-sizing:border-box;
+                   box-shadow:0 2px 20px rgba(0,0,0,.18)">
+            <p style="color:#999;font-size:12px;text-align:center;margin-top:40px">Loading your tailored draft...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  var PREFILL_URL = "/jobs/{{ j.row_key|urlk }}/edit/prefill";
+  var JD_TERMS = [];
+
+  /* ── Row templates ────────────────────────────────────────────────────────── */
+  function rowShell(cls, removeCls, inner) {
+    var d = document.createElement('div');
+    d.className = cls;
+    d.style.cssText = 'background:rgb(var(--c-sand));border:1px solid rgb(var(--c-line));border-radius:12px;padding:14px 16px;position:relative';
+    d.innerHTML =
+      '<button type="button" class="' + removeCls + '" title="Remove" style="position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;border:1px solid rgb(var(--c-line));background:rgb(var(--c-paper));color:rgb(var(--c-muted));cursor:pointer;display:grid;place-items:center">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+      '</button>' + inner;
+    d.querySelector('.' + removeCls).addEventListener('click', function () { d.remove(); scheduleRender(); });
+    return d;
+  }
+
+  function expBlock() {
+    return rowShell('exp-block', 'remove-exp', [
+      '<div class="grid grid-cols-2 gap-3">',
+        '<div class="col-span-2"><label class="filter-label">Role / heading</label>',
+          '<input class="filter-select exp-role" type="text" style="padding-right:36px"></div>',
+        '<div><label class="filter-label">Company</label><input class="filter-select exp-company" type="text"></div>',
+        '<div><label class="filter-label">Dates</label><input class="filter-select exp-dates" type="text"></div>',
+        '<div class="col-span-2"><label class="filter-label">Bullet points (one per line)</label>',
+          '<textarea class="filter-select exp-bullets" rows="4"></textarea></div>',
+      '</div>',
+    ].join(''));
+  }
+
+  function projBlock() {
+    return rowShell('proj-block', 'remove-proj', [
+      '<div class="grid grid-cols-2 gap-3">',
+        '<div class="col-span-2"><label class="filter-label">Project name</label>',
+          '<input class="filter-select proj-name" type="text" style="padding-right:36px"></div>',
+        '<div class="col-span-2"><label class="filter-label">Bullet points (one per line)</label>',
+          '<textarea class="filter-select proj-bullets" rows="3"></textarea></div>',
+      '</div>',
+    ].join(''));
+  }
+
+  function eduBlock() {
+    return rowShell('edu-block', 'remove-edu', [
+      '<div class="grid grid-cols-2 gap-3">',
+        '<div class="col-span-2"><label class="filter-label">Degree / qualification</label>',
+          '<input class="filter-select edu-degree" type="text" style="padding-right:36px"></div>',
+        '<div class="col-span-2"><label class="filter-label">Institution</label><input class="filter-select edu-school" type="text"></div>',
+        '<div><label class="filter-label">Year</label><input class="filter-select edu-year" type="text"></div>',
+        '<div><label class="filter-label">GPA / CGPA <span style="color:rgb(var(--c-muted));font-weight:400">(optional)</span></label>',
+          '<input class="filter-select edu-gpa" type="text"></div>',
+      '</div>',
+    ].join(''));
+  }
+
+  /* ── Collect ──────────────────────────────────────────────────────────────── */
+  function lines(v) { return String(v || '').split('\n').map(function(s){return s.trim();}).filter(Boolean); }
+
+  function collect() {
+    var exps = [];
+    document.querySelectorAll('.exp-block').forEach(function (b) {
+      exps.push({
+        role: b.querySelector('.exp-role').value.trim(),
+        company: b.querySelector('.exp-company').value.trim(),
+        dates: b.querySelector('.exp-dates').value.trim(),
+        bullets: lines(b.querySelector('.exp-bullets').value),
+      });
+    });
+    var projs = [];
+    document.querySelectorAll('.proj-block').forEach(function (b) {
+      projs.push({
+        name: b.querySelector('.proj-name').value.trim(),
+        bullets: lines(b.querySelector('.proj-bullets').value),
+      });
+    });
+    var edus = [];
+    document.querySelectorAll('.edu-block').forEach(function (b) {
+      edus.push({
+        degree: b.querySelector('.edu-degree').value.trim(),
+        school: b.querySelector('.edu-school').value.trim(),
+        year: b.querySelector('.edu-year').value.trim(),
+        gpa: b.querySelector('.edu-gpa').value.trim(),
+      });
+    });
+    return {
+      name: val('f-name'), email: val('f-email'), phone: val('f-phone'),
+      location: val('f-location'), linkedin: val('f-linkedin'),
+      summary: val('f-summary'), skills: val('f-skills'),
+      experiences: exps, projects: projs, education: edus,
+    };
+  }
+  function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+  /* ── Render preview ─────────────────────────────────────────────────────────── */
+  function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function sectionHead(label) {
+    return '<div style="font-size:11pt;font-weight:700;color:#1F4E79;text-transform:uppercase;letter-spacing:.05em;' +
+           'border-bottom:1.5px solid #1F4E79;padding-bottom:2px;margin:14px 0 6px">' + label + '</div>';
+  }
+  function bulletList(arr) {
+    if (!arr || !arr.length) return '';
+    var h = ['<ul style="margin:2px 0 8px 0;padding-left:22px;list-style:disc outside">'];
+    arr.forEach(function (b) { h.push('<li style="font-size:10.5pt;margin-bottom:1px;list-style:disc">' + esc(b) + '</li>'); });
+    h.push('</ul>');
+    return h.join('');
+  }
+
+  function render() {
+    var d = collect();
+    var html = [];
+    if (d.name) html.push('<div style="font-size:18pt;font-weight:700;color:#1F4E79;margin-bottom:3px">' + esc(d.name) + '</div>');
+    var contact = [d.email, d.phone, d.location, d.linkedin].filter(Boolean).map(esc).join(' | ');
+    if (contact) html.push('<div style="font-size:9pt;color:#57534A;margin-bottom:8px">' + contact + '</div>');
+
+    if (d.summary) { html.push(sectionHead('Summary')); html.push('<p style="margin:0 0 6px;font-size:10.5pt">' + esc(d.summary) + '</p>'); }
+
+    var exps = (d.experiences || []).filter(function(e){ return e.role || e.company || (e.bullets && e.bullets.length); });
+    if (exps.length) {
+      html.push(sectionHead('Experience'));
+      exps.forEach(function (e) {
+        var header = '';
+        if (e.role) header += '<strong>' + esc(e.role) + '</strong>';
+        if (e.company) header += (e.role ? ' - ' : '') + esc(e.company);
+        if (e.dates) header += '<span style="float:right;font-size:9.5pt;color:#57534A">' + esc(e.dates) + '</span>';
+        html.push('<div style="margin-bottom:3px;overflow:hidden">' + header + '</div>');
+        html.push(bulletList(e.bullets));
+      });
+    }
+
+    var projs = (d.projects || []).filter(function(p){ return p.name || (p.bullets && p.bullets.length); });
+    if (projs.length) {
+      html.push(sectionHead('Projects'));
+      projs.forEach(function (p) {
+        if (p.name) html.push('<div style="margin-bottom:3px"><strong>' + esc(p.name) + '</strong></div>');
+        html.push(bulletList(p.bullets));
+      });
+    }
+
+    if (d.skills) { html.push(sectionHead('Skills')); html.push('<p style="margin:0 0 6px;font-size:10.5pt">' + esc(d.skills) + '</p>'); }
+
+    var edus = (d.education || []).filter(function(e){ return e.degree || e.school; });
+    if (edus.length) {
+      html.push(sectionHead('Education'));
+      edus.forEach(function (e) {
+        var header = '';
+        if (e.degree) header += '<strong>' + esc(e.degree) + '</strong>';
+        if (e.school) header += ' · ' + esc(e.school);
+        if (e.gpa) header += ' · <span style="color:#57534A">' + esc(e.gpa) + '</span>';
+        if (e.year) header += '<span style="float:right;font-size:9.5pt;color:#57534A">' + esc(e.year) + '</span>';
+        html.push('<div style="margin-bottom:3px;overflow:hidden">' + header + '</div>');
+      });
+    }
+
+    if (!html.length) html.push('<p style="color:#999;font-size:12px;text-align:center;margin-top:40px">Start filling in the form to see your resume here.</p>');
+
+    document.getElementById('preview-paper').innerHTML = html.join('');
+    layoutPaper();
+    updateCoverage(d);
+  }
+
+  /* ── Live keyword coverage ──────────────────────────────────────────────────── */
+  function updateCoverage(d) {
+    var wrap = document.getElementById('cov-wrap');
+    if (!JD_TERMS.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    var hay = [
+      d.summary, d.skills,
+      (d.experiences || []).map(function(e){ return (e.bullets || []).join(' '); }).join(' '),
+      (d.projects || []).map(function(p){ return p.name + ' ' + (p.bullets || []).join(' '); }).join(' '),
+    ].join(' ').toLowerCase();
+    /* Word-boundary match so a short term (R, SQL, Go) doesn't false-hit inside
+       an unrelated word (postgreSQL, oREgon). \b is unreliable around symbols
+       like '+' or '/', so we bound on a non-alphanumeric (or string edge). */
+    function termHit(term) {
+      var t = String(term).toLowerCase().trim();
+      if (!t) return false;
+      var esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      try {
+        return new RegExp('(^|[^a-z0-9])' + esc + '($|[^a-z0-9])').test(hay);
+      } catch (e) {
+        return hay.indexOf(t) !== -1;
+      }
+    }
+    var hit = 0;
+    JD_TERMS.forEach(function (t) { if (termHit(t)) hit++; });
+    var pct = Math.round(100 * hit / JD_TERMS.length);
+    var bar = document.getElementById('cov-bar');
+    bar.style.width = pct + '%';
+    var col = pct >= 70 ? '21 128 61' : (pct >= 45 ? '180 83 9' : '185 28 28');
+    bar.style.background = 'rgb(' + col + ')';
+    var lbl = document.getElementById('cov-pct');
+    lbl.textContent = pct + '%';
+    lbl.style.color = 'rgb(' + col + ')';
+  }
+
+  /* ── Layout pass: scale paper + page-break markers ──────────────────────────── */
+  var A4_H = 1122, A4_W = 794;
+  function layoutPaper() {
+    var scroll = document.getElementById('paper-scroll');
+    var scaler = document.getElementById('paper-scaler');
+    var paper = document.getElementById('preview-paper');
+    if (!scroll || !scaler || !paper) return;
+    var pad = 56;
+    var S = Math.min(1, (scroll.clientWidth - pad) / A4_W);
+    scaler.style.transformOrigin = 'top left';
+    scaler.style.transform = 'scale(' + S + ')';
+    scaler.style.width = Math.round(A4_W * S) + 'px';
+    scaler.style.height = Math.round(paper.offsetHeight * S) + 'px';
+
+    var old = paper.querySelectorAll('.pagebreak');
+    for (var i = 0; i < old.length; i++) old[i].remove();
+    var pages = Math.ceil(paper.offsetHeight / A4_H);
+    for (var k = 1; k < pages; k++) {
+      var marker = document.createElement('div');
+      marker.className = 'pagebreak';
+      marker.style.cssText = ['position:absolute','left:0','right:0','top:' + (k*A4_H) + 'px','border-top:2px dashed #cbd5e1','pointer-events:none','z-index:10'].join(';');
+      var label = document.createElement('span');
+      label.style.cssText = ['position:absolute','right:6px','top:3px','font-size:9px','font-family:Arial,sans-serif','color:#94a3b8','background:#fff','padding:0 4px','border-radius:3px'].join(';');
+      label.textContent = 'Page ' + (k + 1);
+      marker.appendChild(label);
+      paper.appendChild(marker);
+    }
+    var badge = document.getElementById('page-count-badge');
+    if (badge) {
+      badge.style.display = 'inline-block';
+      if (pages <= 1) {
+        badge.textContent = '1 page';
+        badge.style.color = 'rgb(var(--c-good-ink, 21 128 61))';
+        badge.style.background = 'rgb(var(--c-good-soft, 220 252 231))';
+      } else {
+        badge.textContent = pages + ' pages';
+        badge.style.color = 'rgb(var(--c-accent-ink, 180 83 9))';
+        badge.style.background = 'rgb(var(--c-accent-soft, 254 243 199))';
+      }
+    }
+  }
+  var resizeTimer = null;
+  window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(layoutPaper, 120); });
+
+  /* ── Debounced render ───────────────────────────────────────────────────────── */
+  var renderTimer = null;
+  function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 150); }
+
+  /* ── Apply prefill data ─────────────────────────────────────────────────────── */
+  function set(id, v) { var el = document.getElementById(id); if (el && v != null) el.value = v; }
+
+  function applyData(d) {
+    set('f-name', d.name); set('f-email', d.email); set('f-phone', d.phone);
+    set('f-location', d.location); set('f-linkedin', d.linkedin);
+    set('f-summary', d.summary); set('f-skills', d.skills);
+    if (d.cover_paragraphs && d.cover_paragraphs.length) set('f-cover', d.cover_paragraphs.join('\n\n'));
+    JD_TERMS = d.jd_terms || [];
+
+    var expList = document.getElementById('exp-list'); expList.innerHTML = '';
+    (d.experiences && d.experiences.length ? d.experiences : [{}]).forEach(function (e) {
+      var b = expBlock(); expList.appendChild(b);
+      if (e.role) b.querySelector('.exp-role').value = e.role;
+      if (e.company) b.querySelector('.exp-company').value = e.company;
+      if (e.dates) b.querySelector('.exp-dates').value = e.dates;
+      if (e.bullets && e.bullets.length) b.querySelector('.exp-bullets').value = e.bullets.join('\n');
+    });
+
+    var projList = document.getElementById('proj-list'); projList.innerHTML = '';
+    (d.projects && d.projects.length ? d.projects : []).forEach(function (p) {
+      var b = projBlock(); projList.appendChild(b);
+      if (p.name) b.querySelector('.proj-name').value = p.name;
+      if (p.bullets && p.bullets.length) b.querySelector('.proj-bullets').value = p.bullets.join('\n');
+    });
+
+    var eduList = document.getElementById('edu-list'); eduList.innerHTML = '';
+    (d.education && d.education.length ? d.education : [{}]).forEach(function (e) {
+      var b = eduBlock(); eduList.appendChild(b);
+      if (e.degree) b.querySelector('.edu-degree').value = e.degree;
+      if (e.school) b.querySelector('.edu-school').value = e.school;
+      if (e.year) b.querySelector('.edu-year').value = e.year;
+      if (e.gpa) b.querySelector('.edu-gpa').value = e.gpa;
+    });
+  }
+
+  /* ── Add rows ───────────────────────────────────────────────────────────────── */
+  document.getElementById('add-exp').addEventListener('click', function () { document.getElementById('exp-list').appendChild(expBlock()); scheduleRender(); });
+  document.getElementById('add-proj').addEventListener('click', function () { document.getElementById('proj-list').appendChild(projBlock()); scheduleRender(); });
+  document.getElementById('add-edu').addEventListener('click', function () { document.getElementById('edu-list').appendChild(eduBlock()); scheduleRender(); });
+
+  /* ── Download ───────────────────────────────────────────────────────────────── */
+  document.getElementById('download-btn').addEventListener('click', function () {
+    document.getElementById('payload').value = JSON.stringify(collect());
+    document.getElementById('cover-payload').value = val('f-cover');
+    document.getElementById('dl-form').submit();
+  });
+
+  /* ── Bind inputs (form re-renders on every keystroke) ───────────────────────── */
+  document.querySelectorAll('.panel').forEach(function (p) { p.addEventListener('input', scheduleRender); });
+
+  /* ── When a missing skill is claimed, mirror it into the resume skills line ──── */
+  document.body.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-claim-skill]');
+    if (!btn) return;
+    var skill = btn.getAttribute('data-claim-skill');
+    if (!skill) return;
+    var f = document.getElementById('f-skills');
+    var cur = f.value.trim();
+    var have = cur.toLowerCase().split(',').map(function(s){return s.trim();});
+    if (have.indexOf(skill.toLowerCase()) === -1) {
+      f.value = cur ? cur + ', ' + skill : skill;
+      scheduleRender();
+    }
+  });
+
+  /* ── Init ───────────────────────────────────────────────────────────────────── */
+  fetch(PREFILL_URL)
+    .then(function (r) { return r.ok ? r.json() : {}; })
+    .then(function (data) {
+      if (data && !data.error) { applyData(data); }
+      else { document.getElementById('exp-list').appendChild(expBlock()); document.getElementById('edu-list').appendChild(eduBlock()); }
+      render();
+    })
+    .catch(function () {
+      document.getElementById('exp-list').appendChild(expBlock());
+      document.getElementById('edu-list').appendChild(eduBlock());
+      render();
+    });
+})();
+</script>
+{% endblock %}

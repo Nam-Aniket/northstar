@@ -207,6 +207,14 @@ _taxonomy_alias_set: frozenset | None = None
 _soft_label_set: frozenset | None = None
 
 
+def _reset_caches() -> None:
+    """Drop the module-level taxonomy caches so a live re-score (after the user
+    edits skills.json) rebuilds them from the current ontology state."""
+    global _taxonomy_alias_set, _soft_label_set
+    _taxonomy_alias_set = None
+    _soft_label_set = None
+
+
 def _taxonomy_aliases() -> frozenset:
     """Lowercased set of every taxonomy alias — used so a known skill the
     candidate lacks is scored as a gap, never double-counted as 'unclassified'."""

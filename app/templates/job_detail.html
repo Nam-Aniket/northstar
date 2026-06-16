@@ -52,6 +52,11 @@
   <div class="flex flex-col gap-5 lg:sticky lg:top-20">
     <section class="panel p-5">
       <h2 class="section-h">Tailored resume</h2>
+      <a href="/jobs/{{ j.row_key|urlk }}/edit" class="btn-apply mb-3" style="justify-content:center;padding:11px;width:100%">
+        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Tailor &amp; edit for this job
+      </a>
+      <p class="text-xs text-muted mb-3">Edit your resume and cover letter for this role, claim missing skills to lift your fit, then download both.</p>
       {% if j.has_resume %}
         <div class="flex items-center gap-3 mb-3">
           {{ ui.gauge(j.self_check_match_rate, 'high' if j.self_check_passes_target else 'low', 'ATS') }}

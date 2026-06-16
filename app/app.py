@@ -18,6 +18,8 @@ from fastapi.templating import Jinja2Templates
 
 from app import db, locations as app_locations, queries
 
+import config
+
 ROOT = Path(__file__).resolve().parent.parent
 RESUME_DIR = ROOT / "resumes"
 APP_DIR = Path(__file__).resolve().parent
@@ -589,6 +591,224 @@ def builder_ai_bullets(role: str = Form(""), raw: str = Form("")):
         return JSONResponse({"error": str(e)})
     except Exception as e:
         return JSONResponse({"error": "AI request failed: " + str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Per-job live editor — tailor the resume + cover letter for one job, mark
+# missing skills as "have it" (persists + re-scores live), download both.
+# These MUST be declared before the catch-all GET /jobs/{row_key:path} below,
+# or that route would swallow /edit, /edit/prefill and the POST sub-paths.
+# ---------------------------------------------------------------------------
+
+def _parsed_resume() -> dict:
+    """Load the user's parsed résumé (clean structured contact + education),
+    or {} if absent. Used to seed the editor's static fields."""
+    p = UPLOADS_DIR / "parsed_resume.json"
+    if not p.exists():
+        return {}
+    try:
+        with p.open(encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _flatten_skill_lines(lines) -> str:
+    """Turn grouped 'Group: A, B, C' skill lines into one deduped comma list
+    for the editor's skills field (and build_resume_docx)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for line in lines or []:
+        part = line.split(":", 1)[1] if ":" in line else line
+        for s in part.split(","):
+            s = s.strip()
+            if s and s.lower() not in seen:
+                seen.add(s.lower())
+                out.append(s)
+    return ", ".join(out)
+
+
+_DATE_HINT = re.compile(r"\b(19|20)\d{2}\b|present|current", re.IGNORECASE)
+
+
+def _split_slot_header(header: str) -> tuple[str, str, str]:
+    """Recover (role, company, dates) from a facts.json EXPERIENCE_SLOTS header.
+
+    facts_bridge builds the header as ' | '.join([role, company, dates]) dropping
+    blanks, so the editor's dedicated Role/Company/Dates fields (and the download
+    docx) get structured data instead of one pipe-joined blob in the role field."""
+    parts = [p.strip() for p in header.split(" | ") if p.strip()]
+    if not parts:
+        return header, "", ""
+    role = parts[0]
+    rest = parts[1:]
+    dates = ""
+    if rest and _DATE_HINT.search(rest[-1]):
+        dates = rest[-1]
+        rest = rest[:-1]
+    company = ", ".join(rest)
+    return role, company, dates
+
+
+def _editor_prefill(job: dict) -> dict:
+    """Build the JD-tailored editable draft for one job: tailored summary,
+    JD-prioritised skills, JD-selected experience bullets, real projects and
+    education, plus the cover-letter paragraphs and the JD terms (for the live
+    coverage meter). Pure read; generation happens on open, no /apply needed."""
+    import generate_accepted_resumes as gen
+
+    role = job.get("role_title", "")
+    company = job.get("company", "")
+    jd = job.get("job_text", "") or ""
+
+    content = gen.build_content({"role_title": role, "company": company}, jd)
+
+    experiences = []
+    for title_text, slot in gen.EXPERIENCE_SLOTS:
+        bullets = content["bullets_by_slot"].get(slot, [])
+        if title_text or bullets:
+            exp_role, exp_company, exp_dates = _split_slot_header(title_text)
+            experiences.append({"role": exp_role, "company": exp_company,
+                                "dates": exp_dates, "bullets": bullets})
+
+    projects = [{"name": n, "bullets": list(bs)} for n, bs in content.get("projects", [])]
+
+    parsed = _parsed_resume()
+    education = [e for e in (parsed.get("education") or []) if isinstance(e, dict)]
+
+    name = config.NAME
+    # Prefer the parsed résumé's structured contact fields; fall back to splitting
+    # the pre-joined config.CONTACT string on its separators.
+    email = parsed.get("email") or ""
+    phone = parsed.get("phone") or ""
+    location = parsed.get("location") or ""
+    linkedin = parsed.get("linkedin") or ""
+    if not any([email, phone, location, linkedin]) and config.CONTACT:
+        parts = [p.strip() for p in re.split(r"\s*\|\s*", config.CONTACT) if p.strip()]
+        for part in parts:
+            low = part.lower()
+            if "@" in part and not email:
+                email = part
+            elif "linkedin" in low and not linkedin:
+                linkedin = part
+            elif re.search(r"\d", part) and "linkedin" not in low and not phone:
+                phone = part
+            elif not location:
+                location = part
+
+    cover_paragraphs = gen.cover_letter_paragraphs(content, company, role, jd)
+
+    # JD terms for the live coverage meter: evidenced + gap labels for this job.
+    gaps = job.get("gaps_list", [])
+    jd_terms = sorted(set(job.get("evidence_list", []) + gaps))
+
+    # Don't seed the résumé skills line with skills the candidate doesn't yet
+    # evidence (the job's current gaps): listing an unclaimed skill is both
+    # dishonest and confusing (it would show as covered here while the Match-fit
+    # panel lists it as missing). Claiming a gap adds it back via the editor.
+    gap_lc = {g.strip().lower() for g in gaps}
+    skills = ", ".join(
+        s for s in _flatten_skill_lines(content["skills_lines"]).split(", ")
+        if s and s.strip().lower() not in gap_lc
+    )
+
+    return {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "location": location,
+        "linkedin": linkedin,
+        "summary": content["summary"],
+        "skills": skills,
+        "experiences": experiences,
+        "projects": projects,
+        "education": education,
+        "cover_paragraphs": cover_paragraphs,
+        "jd_terms": jd_terms,
+    }
+
+
+@app.get("/jobs/{row_key:path}/edit", response_class=HTMLResponse)
+def job_editor(request: Request, row_key: str):
+    con = conn(); job = queries.get_job(con, row_key); con.close()
+    if not job:
+        return HTMLResponse("Job not found", status_code=404)
+    return templates.TemplateResponse(request, "job_editor.html", {"j": job})
+
+
+@app.get("/jobs/{row_key:path}/edit/prefill")
+def job_editor_prefill(row_key: str):
+    con = conn(); job = queries.get_job(con, row_key); con.close()
+    if not job:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    try:
+        return JSONResponse(_editor_prefill(job))
+    except Exception as e:
+        return JSONResponse({"error": "prefill failed: " + str(e)}, status_code=500)
+
+
+@app.post("/jobs/{row_key:path}/skills/add", response_class=HTMLResponse)
+def job_editor_add_skill(request: Request, row_key: str, label: str = Form(...)):
+    con = conn()
+    job = queries.get_job(con, row_key)
+    if not job:
+        con.close()
+        return HTMLResponse("Job not found", status_code=404)
+
+    label = (label or "").strip()
+    # Only allow adding a skill the scorer actually flagged as a gap for THIS job,
+    # so the button can't be used to inject arbitrary skills.
+    if label and label in job.get("gaps_list", []):
+        import score_jobs
+        # Serialise the read-modify-write of skills.json + the in-process bank
+        # reset against any concurrent claim (see queries.SKILLS_LOCK).
+        with queries.SKILLS_LOCK:
+            queries.add_supported_skill(label)
+            config.reset_banks()
+            score_jobs._reset_caches()
+            queries.rescore_job(con, row_key)
+        job = queries.get_job(con, row_key)
+
+    con.close()
+    return templates.TemplateResponse(request, "_job_fit.html", {"j": job})
+
+
+@app.post("/jobs/{row_key:path}/download")
+def job_editor_download(row_key: str, payload: str = Form(...), cover: str = Form("")):
+    con = conn(); job = queries.get_job(con, row_key); con.close()
+    if not job:
+        return HTMLResponse("Job not found", status_code=404)
+
+    import zipfile
+    from resume_docx import build_resume_docx
+    import generate_accepted_resumes as gen
+
+    data = json.loads(payload)
+
+    resume_doc = build_resume_docx(data)
+    resume_buf = BytesIO()
+    resume_doc.save(resume_buf)
+
+    # Split the edited cover text on blank lines into body paragraphs.
+    cover_paras = [p.strip() for p in re.split(r"\n\s*\n", cover or "") if p.strip()]
+    cover_buf = BytesIO()
+    if cover_paras:
+        gen.write_cover_letter_docx_from_paragraphs(cover_paras, cover_buf)
+
+    base = (job.get("company") or "resume").strip().replace(" ", "_").lower()
+    base = re.sub(r"[^a-z0-9_]+", "", base) or "application"
+
+    zip_buf = BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{base}_resume.docx", resume_buf.getvalue())
+        if cover_paras:
+            zf.writestr(f"{base}_cover_letter.docx", cover_buf.getvalue())
+
+    return Response(
+        content=zip_buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{base}_application.zip"'},
+    )
 
 
 @app.get("/jobs/{row_key:path}", response_class=HTMLResponse)

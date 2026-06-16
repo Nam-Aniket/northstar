@@ -140,6 +140,34 @@ def build_resume_docx(data: dict) -> Document:
                 r = bp.add_run(bullet)
                 _set_font(r, 10.5)
 
+    # ── Projects ─────────────────────────────────────────────────────────────
+    # Optional. The shared Builder page never sends projects; the per-job editor
+    # does, so its download carries the same Projects section as the apply-flow
+    # resume. Shape: [{name, bullets: [str, ...]}].
+    projects = data.get("projects") or []
+    projects = [p for p in projects if isinstance(p, dict)]
+    rendered_projects = [
+        p for p in projects
+        if (p.get("name") or "").strip() or [b for b in (p.get("bullets") or []) if b.strip()]
+    ]
+    if rendered_projects:
+        _section_heading(doc, "Projects")
+        for proj in rendered_projects:
+            pname = (proj.get("name") or "").strip()
+            pbullets = [b.strip() for b in (proj.get("bullets") or []) if b.strip()]
+            if pname:
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(5)
+                p.paragraph_format.space_after = Pt(1)
+                r = p.add_run(pname)
+                _set_font(r, 10.5, bold=True)
+            for bullet in pbullets:
+                bp = doc.add_paragraph(style="List Bullet")
+                bp.paragraph_format.space_after = Pt(1)
+                bp.paragraph_format.left_indent = Cm(0.5)
+                r = bp.add_run(bullet)
+                _set_font(r, 10.5)
+
     # ── Skills ───────────────────────────────────────────────────────────────
     skills = (data.get("skills") or "").strip()
     if skills:

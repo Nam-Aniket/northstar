@@ -15,6 +15,7 @@ from resume_parser import (
     _is_entry_header,
     _extract_education,
     _extract_projects,
+    _merge_two_line_headers,
 )
 
 
@@ -163,6 +164,122 @@ class TestSkillsSplit(unittest.TestCase):
         )
         p = parse_resume(resume)
         self.assertTrue(p["skills"], "skills should populate from ontology when no SKILLS section")
+
+
+class TestTwoLineHeaderMerge(unittest.TestCase):
+    """A job whose title+dates sit on one line and company+location on the next
+    must collapse into ONE experience with the real bullets, not leave a
+    bullet-less title slot that later gets a 'Contributed to ...' filler."""
+
+    def test_two_line_title_company_merges(self):
+        entries = [
+            {"role": "Data Analytics Intern", "company": "", "dates": "Feb 2026 - Present", "bullets": []},
+            {"role": "Cultural Infusion", "company": "Melbourne, Australia", "dates": "", "bullets":
+                ["Developed Atlas OSINT tooling.", "Engineered an ETL pipeline."]},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(len(merged), 1)
+        m = merged[0]
+        self.assertEqual(m["role"], "Data Analytics Intern")
+        self.assertEqual(m["dates"], "Feb 2026 - Present")
+        self.assertTrue(m["company"].startswith("Cultural Infusion"))
+        self.assertIn("Melbourne", m["company"])
+        self.assertEqual(len(m["bullets"]), 2)
+        self.assertTrue(all("Contributed to" not in b for b in m["bullets"]))
+
+    def test_single_line_header_unchanged(self):
+        # The common case: a fully-parsed single-line header (company present)
+        # must NEVER be merged into a neighbour.
+        entries = [
+            {"role": "Data Analyst", "company": "Acme Corp", "dates": "Jan 2021 - Dec 2022",
+             "bullets": ["Automated billing reports."]},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["company"], "Acme Corp")
+        self.assertEqual(merged[0]["bullets"], ["Automated billing reports."])
+
+    def test_two_real_dated_jobs_not_merged(self):
+        # Two consecutive single-line jobs, each carrying its own dates, stay separate.
+        entries = [
+            {"role": "Senior Analyst", "company": "Acme", "dates": "2022 - 2024", "bullets": ["Did X."]},
+            {"role": "Analyst", "company": "Beta", "dates": "2020 - 2022", "bullets": ["Did Y."]},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(len(merged), 2)
+
+    def test_trailing_bare_title_not_merged(self):
+        # A final title-with-date and no following company line has no successor
+        # to merge with; it is emitted unchanged.
+        entries = [
+            {"role": "Data Analyst", "company": "Acme", "dates": "2022 - 2024", "bullets": ["Did X."]},
+            {"role": "Consultant", "company": "", "dates": "2019 - 2020", "bullets": []},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[-1]["role"], "Consultant")
+
+    def test_end_to_end_two_line_layout_pipe(self):
+        # Integration through parse_resume (Mode 1): a separator-bearing company
+        # line parses as its own entry and folds into the title.
+        resume = (
+            "EXPERIENCE\n"
+            "Senior Data Analyst    Jan 2021 - Dec 2022\n"
+            "Acme Corp | Melbourne\n"
+            "- Built Power BI dashboards over large datasets.\n"
+            "- Automated SQL reconciliation reports.\n"
+        )
+        p = parse_resume(resume)
+        exps = p["experiences"]
+        self.assertEqual(len(exps), 1)
+        self.assertEqual(exps[0]["role"], "Senior Data Analyst")
+        self.assertTrue(exps[0]["company"].startswith("Acme Corp"))
+        self.assertEqual(len(exps[0]["bullets"]), 2)
+        self.assertTrue(all("Contributed to" not in b for b in exps[0]["bullets"]))
+
+    def test_end_to_end_two_line_layout_comma(self):
+        # Integration through parse_resume (Mode 2): the COMMON layout where the
+        # company line is plain "Company, City, Country" with no header
+        # separator. This is the case that previously leaked the company string
+        # in as a bullet and left company empty.
+        resume = (
+            "EXPERIENCE\n"
+            "Data Analytics Intern    Feb 2026 - Present\n"
+            "Cultural Infusion, Melbourne, Australia\n"
+            "- Developed Atlas OSINT tooling.\n"
+            "- Engineered an ETL pipeline.\n"
+        )
+        p = parse_resume(resume)
+        exps = p["experiences"]
+        self.assertEqual(len(exps), 1)
+        self.assertEqual(exps[0]["role"], "Data Analytics Intern")
+        self.assertTrue(exps[0]["company"].startswith("Cultural Infusion"))
+        # The company string must NOT appear among the bullets.
+        self.assertTrue(all("Cultural Infusion" not in b for b in exps[0]["bullets"]))
+        self.assertEqual(len(exps[0]["bullets"]), 2)
+        self.assertTrue(all("Contributed to" not in b for b in exps[0]["bullets"]))
+
+    def test_mode2_promotes_company_bullet(self):
+        # Unit: a title entry that absorbed a comma company line as its first
+        # bullet has that line promoted to company.
+        entries = [
+            {"role": "Data Analytics Intern", "company": "", "dates": "Feb 2026 - Present",
+             "bullets": ["Cultural Infusion, Melbourne, Australia", "Built SQL dashboards."]},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["company"], "Cultural Infusion, Melbourne, Australia")
+        self.assertEqual(merged[0]["bullets"], ["Built SQL dashboards."])
+
+    def test_mode2_does_not_promote_real_bullet(self):
+        # A normal action-verb first bullet must stay a bullet (company empty).
+        entries = [
+            {"role": "Data Analyst", "company": "", "dates": "2022 - 2024",
+             "bullets": ["Built dashboards, automated reports.", "Reduced run-time by 60%."]},
+        ]
+        merged = _merge_two_line_headers(entries)
+        self.assertEqual(merged[0]["company"], "")
+        self.assertEqual(len(merged[0]["bullets"]), 2)
 
 
 if __name__ == "__main__":
