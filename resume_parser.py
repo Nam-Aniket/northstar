@@ -322,6 +322,91 @@ def _is_bullet(line: str) -> bool:
     return bool(_BULLET_RE.match(stripped)) or stripped[0].isupper()
 
 
+def _looks_like_company_line(text: str) -> bool:
+    """True if a line looks like a 'Company, City[, Country]' header line rather
+    than a résumé bullet. Used to recover the company when a comma-separated
+    company line (no header separator) was absorbed as a title entry's first
+    'bullet'. Deliberately conservative: real bullets open with an action verb
+    and tend to be longer, so we require a title-ish, comma-bearing, short,
+    verb-free, non-sentence line."""
+    words = text.split()
+    if not words or len(words) > 6:
+        return False
+    if "," not in text:
+        return False
+    if text.rstrip().endswith((".", ":", ";")):
+        return False
+    if words[0].lower().strip(".,") in _VERB_LEXICON:
+        return False
+    return _titleish(text)
+
+
+def _merge_two_line_headers(entries: list[dict]) -> list[dict]:
+    """Merge a 'title-line then company-line' job split into one entry.
+
+    Some résumés put the job title + dates on one line and the company +
+    location on the next, e.g.
+
+        Data Analytics Intern                 Feb 2026 - Present
+        Cultural Infusion, Melbourne, Australia
+          - bullet ...
+
+    Left split, the bullet-less title entry later gets a 'Contributed to {role}.'
+    filler bullet downstream. We collapse the pair into one entry. The company
+    line reaches us one of two ways depending on its separator:
+
+      Mode 1 - the company line carried a header separator (pipe/dash/middot/
+      "at"), so it parsed as its OWN entry B (role + company, no dates) and the
+      real bullets attached to B. We fold B into the preceding title entry A.
+
+      Mode 2 - the company line was plain "Company, City" (no header separator),
+      so the header detector did NOT recognise it and it was absorbed as A's
+      first "bullet". We promote that leading line to A's company.
+
+    Trigger in both modes: a title entry A that has dates, no company, and (Mode
+    1) no bullets / (Mode 2) a leading company-shaped bullet.
+
+    Known limitation: an undated company-line is structurally indistinguishable
+    from a genuinely separate undated next job. So a dated, company-less,
+    bullet-less role immediately followed by an undated separate job can be
+    mis-merged. This is inherent to the two-line layout; the user reviews and can
+    correct the parsed result in the editor.
+    """
+    out: list[dict] = []
+    i = 0
+    n = len(entries)
+    while i < n:
+        a = entries[i]
+        b = entries[i + 1] if i + 1 < n else None
+        # Mode 1: the company line parsed as its own (undated) entry B.
+        if (b is not None
+                and a["dates"] and not a["company"] and not a["bullets"]
+                and not b["dates"] and b["role"]):
+            company = f'{b["role"]}, {b["company"]}' if b["company"] else b["role"]
+            out.append({
+                "role": a["role"],
+                "company": company,
+                "dates": a["dates"],
+                "bullets": b["bullets"],
+            })
+            i += 2
+            continue
+        # Mode 2: the company line was absorbed as A's leading "bullet".
+        if (a["dates"] and not a["company"] and a["bullets"]
+                and _looks_like_company_line(a["bullets"][0])):
+            out.append({
+                "role": a["role"],
+                "company": a["bullets"][0],
+                "dates": a["dates"],
+                "bullets": a["bullets"][1:],
+            })
+            i += 1
+            continue
+        out.append(a)
+        i += 1
+    return out
+
+
 def _extract_experiences(block: list[str]) -> list[dict]:
     """Parse an EXPERIENCE block into a list of experience dicts.
 
@@ -359,7 +444,7 @@ def _extract_experiences(block: list[str]) -> list[dict]:
     if current is not None:
         entries.append(current)
 
-    return entries
+    return _merge_two_line_headers(entries)
 
 
 def _extract_projects(block: list[str]) -> list[dict]:
