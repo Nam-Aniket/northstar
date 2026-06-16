@@ -423,6 +423,37 @@ def get_target_keywords() -> List[str]:  # noqa: F811
 # Validation (called lazily — only when banks are first used)
 # ---------------------------------------------------------------------------
 
+def reset_banks() -> None:
+    """Drop every in-process cache derived from skills.json.
+
+    The skill banks are lazy singletons that load once and stay cached for the
+    life of the process. After skills.json changes on disk (e.g. the user adds a
+    skill in the editor) those caches are stale, so a re-score would not see the
+    new skill and the feature would look broken. This clears the raw file cache,
+    empties + un-loads each lazy bank, and resets the ontology automaton cache so
+    the next access reloads from disk.
+    """
+    global _skills_raw, _config_raw
+    _skills_raw = None
+    _config_raw = None
+
+    for bank in (TERM_BANK, UNSUPPORTED_BANK, SUPPORTED_TERMS, UNSUPPORTED_TERMS,
+                 _TERM_PATTERNS, _UNSUPPORTED_PATTERNS):
+        bank.clear()
+        bank._loaded = False
+
+    # Identity/config proxy also reloads on next access.
+    _proxy._loaded = False
+    _proxy._data = {}
+
+    try:
+        import ontology
+        ontology._reset_cache()
+    except Exception:
+        # Ontology is optional at import time; a missing reset is non-fatal.
+        pass
+
+
 def _validate_banks() -> None:
     """Structural validation of the loaded skill banks."""
     for label, meta in TERM_BANK.items():

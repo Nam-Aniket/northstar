@@ -6,8 +6,17 @@ import html as _html
 import json
 import os
 import re
+import threading
+from pathlib import Path
 
 from app import db
+
+# Serialises the editor's claim-a-skill path (add_supported_skill -> reset_banks
+# -> rescore_job). FastAPI runs sync routes in a threadpool, so two near-
+# simultaneous claims could otherwise interleave their read-modify-write of
+# skills.json (lost update) or clear the lazy skill banks mid-score. Single-user
+# app, so contention is effectively zero and a coarse lock is free.
+SKILLS_LOCK = threading.Lock()
 
 
 def _now() -> str:
@@ -871,6 +880,165 @@ def set_projects(projects: list) -> None:
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, str(cfg_path))
+
+
+def add_supported_skill(label: str) -> bool:
+    """Add one skill the user says they have to skills.json supported_skills.
+
+    Atomic write. Aliases/group come from the taxonomy (ontology) so the new
+    entry matches the same wording the scorer recognises; if the taxonomy knows
+    no usable alias for the label we fall back to the normalised label itself so
+    the entry never has empty aliases. The label is also removed from
+    unsupported_skills so the two banks never share a key. (config._validate_banks
+    encodes both invariants but is not wired into the runtime scoring path, so we
+    enforce them here at write time rather than relying on a load-time guard.)
+
+    Always WRITES to skills.json (never the shipped skills.example.json). Returns
+    True if anything changed, False if the skill was already supported.
+    Caller must invalidate the in-process caches (config.reset_banks etc.).
+    """
+    import config as _config
+    import ontology
+
+    label = (label or "").strip()
+    if not label:
+        return False
+
+    # Write to the env-pointed file if set (keeps tests isolated), else the real
+    # skills.json. Never the shipped skills.example.json.
+    override = os.environ.get("JOBENGINE_SKILLS")
+    skills_path = Path(override) if override else (_config.ROOT / "skills.json")
+    example_path = _config.ROOT / "skills.example.json"
+    base_path = skills_path if skills_path.exists() else example_path
+    data: dict = {}
+    if base_path.exists():
+        with base_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+
+    supported = data.setdefault("supported_skills", {})
+    unsupported = data.setdefault("unsupported_skills", {})
+
+    already = label in supported
+    removed = unsupported.pop(label, None) is not None
+
+    if not already:
+        aliases = ontology.aliases_for([label]).get(label, [])
+        if not aliases:
+            aliases = [ontology.normalize(label)]
+        # Deduplicate while preserving order; guarantee the label's own
+        # normalised form is present so an exact JD mention always matches.
+        seen: set = set()
+        ordered = []
+        for a in [ontology.normalize(label)] + aliases:
+            if a and a not in seen:
+                seen.add(a)
+                ordered.append(a)
+        supported[label] = {"aliases": ordered, "group": ontology.group_for(label)}
+
+    if already and not removed:
+        return False
+
+    tmp = str(skills_path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, str(skills_path))
+    return True
+
+
+def rescore_job(con, row_key: str) -> dict | None:
+    """Re-run the FIT scorer for one job and persist the new result.
+
+    Updates the live DB row AND patches matched_jobs.csv (the source app/sync.py
+    rebuilds from) so the new score survives the next sync instead of reverting.
+    Returns the score_jobs.score_job result dict, or None if the job/JD is absent.
+
+    Caller is responsible for invalidating the skill caches first
+    (config.reset_banks + score_jobs._reset_caches) so the re-score reflects any
+    skills just added; otherwise it re-computes the same (stale) result.
+    """
+    import score_jobs
+
+    r = con.execute(
+        "SELECT job_text, role_title FROM jobs WHERE row_key = ?", (row_key,)
+    ).fetchone()
+    if not r:
+        return None
+    jd = (r["job_text"] or "").strip()
+    role = (r["role_title"] or "").strip()
+    if not jd:
+        return None
+
+    result = score_jobs.score_job(role, jd)
+    family = score_jobs.role_family(role, jd)
+    why = score_jobs._why_keep(result, family)
+    evidence = "; ".join(result["supported"])
+    gaps = "; ".join(result["lacked"])
+    unclassified = "; ".join(result["unclassified"])
+
+    con.execute(
+        """UPDATE jobs SET match_score = ?, match_band = ?, matched_evidence = ?,
+                           gaps = ?, why_keep = ?, confidence = ?,
+                           unclassified_requirements = ?
+           WHERE row_key = ?""",
+        (str(result["fit"]), result["band"], evidence, gaps, why,
+         result["confidence"], unclassified, row_key),
+    )
+    con.commit()
+
+    _patch_matched_csv(row_key, result, why)
+    return result
+
+
+def _patch_matched_csv(row_key: str, result: dict, why: str) -> None:
+    """Rewrite the matched_jobs.csv row for row_key with the fresh score so the
+    next app/sync.py run keeps the live re-score instead of reverting it.
+
+    No-op if the CSV or the row is missing (the DB already holds the new score;
+    the CSV only matters for sync persistence)."""
+    import csv
+    import csv_merge
+    import score_jobs
+
+    path = score_jobs.MATCHED
+    if not path.exists():
+        return
+
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        rows = list(reader)
+
+    patched = False
+    for row in rows:
+        if csv_merge.row_key(row) == row_key:
+            row["match_score"] = str(result["fit"])
+            row["match_band"] = result["band"]
+            row["matched_evidence"] = "; ".join(result["supported"])
+            row["gaps"] = "; ".join(result["lacked"])
+            row["why_keep"] = why
+            if "confidence" in fieldnames:
+                row["confidence"] = result["confidence"]
+            if "unclassified_requirements" in fieldnames:
+                row["unclassified_requirements"] = "; ".join(result["unclassified"])
+            if "auto_reject_risk" in fieldnames:
+                row["auto_reject_risk"] = "yes" if result["auto_reject_risk"] else ""
+            if "knockouts" in fieldnames:
+                row["knockouts"] = "; ".join(
+                    f"{k['type']}:{k['detail']}({k['status']})" for k in result["knockouts"]
+                )
+            patched = True
+            break
+
+    if not patched:
+        return
+
+    tmp = str(path) + ".tmp"
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(tmp, str(path))
 
 
 def highlight(text, evidence) -> str:

@@ -848,7 +848,12 @@ def cover_letter_paragraphs(content: Dict, company: str, role: str, jd_text: str
     return paragraphs
 
 
-def write_cover_letter_docx(content: Dict, company: str, role: str, jd_text: str, path: Path) -> None:
+def write_cover_letter_docx_from_paragraphs(paragraphs: List[str], path: Path) -> None:
+    """Render a cover letter .docx from already-prepared body paragraphs.
+
+    The letterhead (name, contact, work rights), greeting and sign-off are added
+    here; `paragraphs` is the body only. Used by the per-job editor so the user's
+    EDITED cover text is what gets written, not a regenerated one."""
     doc = Document()
     section = doc.sections[0]
     section.page_width = Inches(8.27)
@@ -881,11 +886,18 @@ def write_cover_letter_docx(content: Dict, company: str, role: str, jd_text: str
     rights_p.paragraph_format.space_after = Pt(14)
 
     doc.add_paragraph("Dear Hiring Manager,")
-    for para in cover_letter_paragraphs(content, company, role, jd_text):
-        doc.add_paragraph(para)
+    for para in paragraphs:
+        if para.strip():
+            doc.add_paragraph(para.strip())
     doc.add_paragraph(f"Best regards,\n{NAME.split()[0]}")
 
     doc.save(path)
+
+
+def write_cover_letter_docx(content: Dict, company: str, role: str, jd_text: str, path: Path) -> None:
+    write_cover_letter_docx_from_paragraphs(
+        cover_letter_paragraphs(content, company, role, jd_text), path
+    )
 
 
 # ---------------------------------------------------------------------------

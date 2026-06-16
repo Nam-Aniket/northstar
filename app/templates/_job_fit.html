@@ -1,0 +1,48 @@
+{% import "_macros.html" as ui %}
+{# Fit gauge + claimable gaps for the per-job editor. Swapped in place (outerHTML)
+   after the user marks a missing skill as one they have, so the score and the
+   remaining gap list update live without a page reload. #}
+<div id="job-fit" class="flex flex-col gap-4">
+  <div class="flex items-center gap-3">
+    <span class="tip">{{ ui.gauge(j.match_score, j.score_tone, 'Fit') }}<span role="tooltip" class="tip__bubble">Fit {{ j.match_score }}% - how well your skills cover this job's requirements.</span></span>
+    <div class="min-w-0">
+      <div class="font-medium text-sm">Match fit</div>
+      <div class="text-muted text-xs">
+        {% if j.match_band == 'strong' %}Strong match{% elif j.match_band == 'fair' %}Fair match{% else %}Low match{% endif %}
+        {% if j.low_confidence %} · low confidence{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if j.evidence_list %}
+  <div>
+    <p class="text-xs uppercase tracking-wide text-muted mb-1.5">Skills you evidence</p>
+    <div class="flex flex-wrap gap-1.5">{% for e in j.evidence_list %}<span class="tag-good">{{ e }}</span>{% endfor %}</div>
+  </div>
+  {% endif %}
+
+  {% if j.gaps_list %}
+  <div>
+    <p class="text-xs uppercase tracking-wide text-muted mb-1.5">Missing skills</p>
+    <p class="text-xs text-muted mb-2">Have one of these? Mark it and your fit re-scores instantly.</p>
+    <div class="flex flex-wrap gap-1.5">
+      {% for g in j.gaps_list %}
+      <button type="button"
+              class="tag-warn group inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+              data-claim-skill="{{ g }}"
+              hx-post="/jobs/{{ j.row_key|urlk }}/skills/add"
+              hx-vals='{"label": {{ g|tojson }} }'
+              hx-target="#job-fit"
+              hx-swap="outerHTML"
+              hx-disabled-elt="this"
+              title="I have {{ g }} - add it and re-score">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        {{ g }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p class="text-xs text-leaf">No outstanding skill gaps for this role.</p>
+  {% endif %}
+</div>
