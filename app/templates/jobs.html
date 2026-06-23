@@ -48,6 +48,7 @@
           class="panel p-4 flex flex-col gap-5">
       <input type="hidden" name="day" value="{{ f.day }}">
       <input type="hidden" name="view" value="{{ f.view }}">
+      <input type="hidden" name="everything" value="{{ f.everything }}">
       <div>
         <label for="q" class="filter-label flex items-center gap-2">Search <span id="filter-spin" class="htmx-indicator spinner" style="width:11px;height:11px;color:rgb(var(--c-accent))" aria-hidden="true"></span></label>
         <div class="relative">
@@ -71,6 +72,15 @@
         <select id="status" name="status" class="filter-select">
           <option value="">Any stage</option>
           {% for st in ['new','applied','phone_screen','interview','offer','rejected'] %}<option value="{{ st }}" {{ 'selected' if f.status==st }}>{{ st.replace('_',' ')|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="level" class="filter-label">Seniority cap</label>
+        <select id="level" name="level" class="filter-select">
+          <option value="" {{ 'selected' if not f.level }}>Auto (from your roles)</option>
+          <option value="entry" {{ 'selected' if f.level=='entry' }}>Entry &amp; below</option>
+          <option value="mid" {{ 'selected' if f.level=='mid' }}>Mid &amp; below</option>
+          <option value="senior" {{ 'selected' if f.level=='senior' }}>Senior &amp; below</option>
         </select>
       </div>
       <div class="flex flex-col gap-2.5 pt-1 border-t border-line">

@@ -1,5 +1,10 @@
 <div class="flex items-center justify-between mb-3">
   <p class="text-sm text-ink2"><span class="font-semibold text-ink">{{ jobs|length }}</span> {{ 'role' if jobs|length == 1 else 'roles' }}</p>
+  {% if for_me_active %}
+    <p class="text-xs text-muted">Matched to your targets{% if hidden_count %} · {{ hidden_count }} off-target hidden{% endif %} · <a class="text-clay hover:underline" href="/?everything=1{% if current_day and current_day != 'all' %}&day={{ current_day }}{% endif %}{% if f.level %}&level={{ f.level }}{% endif %}">Show everything</a></p>
+  {% elif everything and not view %}
+    <p class="text-xs text-muted">Showing all jobs · <a class="text-clay hover:underline" href="/?{% if current_day and current_day != 'all' %}day={{ current_day }}&{% endif %}{% if f.level %}level={{ f.level }}{% endif %}">Back to your matches</a></p>
+  {% endif %}
 </div>
 {% if jobs %}
   <div class="flex flex-col gap-3">
