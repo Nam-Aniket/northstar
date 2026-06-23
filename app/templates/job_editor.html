@@ -28,6 +28,7 @@
     <div class="panel p-5">
       <h2 class="section-h mb-3">Match fit</h2>
       {% include "_job_fit.html" %}
+      <div id="bullet-suggestions" class="mt-4"></div>
     </div>
 
     <div class="panel p-5 flex flex-col gap-5">
@@ -480,6 +481,72 @@
       f.value = cur ? cur + ', ' + skill : skill;
       scheduleRender();
     }
+  });
+
+  /* ── Find the experience block for a slot (exact), else by role text ──────── */
+  function findExpBlock(slot, roleHeader) {
+    var blocks = document.querySelectorAll('.exp-block');
+    var i;
+    if (slot) {
+      for (i = 0; i < blocks.length; i++) {
+        if (blocks[i].dataset.slot === slot) return blocks[i];
+      }
+    }
+    if (roleHeader) {
+      var head = roleHeader.toLowerCase();
+      for (i = 0; i < blocks.length; i++) {
+        var r = (blocks[i].querySelector('.exp-role') || {}).value || '';
+        if (r && head.indexOf(r.trim().toLowerCase()) !== -1) return blocks[i];
+      }
+    }
+    return blocks.length ? blocks[0] : null;
+  }
+
+  function insertBulletInto(block, text) {
+    if (!block) return;
+    var bl = block.querySelector('.bullet-list');
+    var dup = Array.prototype.some.call(bl.querySelectorAll('.bullet-text'),
+      function (t) { return t.value.trim() === text.trim(); });
+    if (!dup) { bl.appendChild(bulletRow(text)); scheduleRender(); }
+  }
+
+  /* ── Add a fact-bank evidence bullet into its role (Part A) ────────────────── */
+  document.body.addEventListener('click', function (e) {
+    if (!e.target.closest('.suggest-add')) return;
+    var card = e.target.closest('.suggest-card');
+    if (!card) return;
+    insertBulletInto(findExpBlock(card.getAttribute('data-target-slot'),
+                                  card.querySelector('.suggest-role').textContent),
+                     card.getAttribute('data-add-bullet'));
+    card.classList.add('is-added');
+    var btn = card.querySelector('.suggest-add');
+    btn.textContent = 'Added'; btn.disabled = true;
+  });
+
+  /* ── Write-once: save a new bullet to the fact bank + place it (Part B) ────── */
+  document.body.addEventListener('click', function (e) {
+    if (!e.target.closest('.wo-save')) return;
+    var form = e.target.closest('.writeonce');
+    var text = form.querySelector('.wo-text').value.trim();
+    var slot = form.querySelector('.wo-slot').value;
+    var skill = form.getAttribute('data-skill');
+    var row = form.getAttribute('data-row');
+    if (!text) { form.querySelector('.wo-text').focus(); return; }
+    var btn = e.target.closest('.wo-save'); btn.disabled = true; btn.textContent = 'Saving...';
+    var body = new URLSearchParams({skill: skill, slot: slot, text: text});
+    fetch('/jobs/' + encodeURIComponent(row) + '/bullets/add',
+          {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'failed'); }); })
+      .then(function (d) {
+        insertBulletInto(findExpBlock(d.slot, d.role_header), d.text);
+        form.parentNode.innerHTML = '<p class="text-xs text-leaf">Added to ' + esc(d.role_header) + ' and saved to your fact bank.</p>';
+      })
+      .catch(function (err) {
+        btn.disabled = false; btn.textContent = 'Save & add';
+        var msg = document.createElement('p'); msg.className = 'text-xs'; msg.style.color = 'rgb(185 28 28)';
+        msg.textContent = 'Could not save: ' + err.message;
+        form.appendChild(msg);
+      });
   });
 
   /* ── Init ───────────────────────────────────────────────────────────────────── */

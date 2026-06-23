@@ -46,3 +46,11 @@
   <p class="text-xs text-leaf">No outstanding skill gaps for this role.</p>
   {% endif %}
 </div>
+{% if claimed_skill %}
+{# After a claim, load the placeable evidence bullets for that skill into the
+   persistent #bullet-suggestions container (out-of-band, since this partial
+   replaces #job-fit only). #}
+<div id="bullet-suggestions" class="mt-4"
+     hx-get="/jobs/{{ j.row_key|urlk }}/bullets?skill={{ claimed_skill|urlencode }}"
+     hx-trigger="load" hx-swap="innerHTML" hx-swap-oob="true"></div>
+{% endif %}
