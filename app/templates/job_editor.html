@@ -106,8 +106,9 @@
     <div class="panel overflow-hidden">
       {# Toolbar #}
       <div class="flex items-center justify-between gap-3 px-5 py-3 border-b flex-wrap" style="border-color:rgb(var(--c-line))">
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Resume preview</span>
+        <div class="flex items-center gap-2">
+          <button type="button" id="tab-resume" class="prev-tab is-active">Resume</button>
+          <button type="button" id="tab-cover" class="prev-tab">Cover letter</button>
           <span id="page-count-badge" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;line-height:1.6"></span>
         </div>
         <button type="button" id="download-btn" class="btn-apply">
@@ -136,6 +137,10 @@
                    box-shadow:0 2px 20px rgba(0,0,0,.18)">
             <p style="color:#999;font-size:12px;text-align:center;margin-top:40px">Loading your tailored draft...</p>
           </div>
+          <div id="cover-paper"
+            style="display:none;position:relative;background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:11pt;
+                   line-height:1.5;padding:76px;width:794px;min-height:1122px;box-sizing:border-box;
+                   box-shadow:0 2px 20px rgba(0,0,0,.18)"></div>
         </div>
       </div>
     </div>
@@ -330,6 +335,7 @@
     document.getElementById('preview-paper').innerHTML = html.join('');
     layoutPaper();
     updateCoverage(d);
+    renderCover();
   }
 
   /* ── Live keyword coverage ──────────────────────────────────────────────────── */
@@ -482,6 +488,34 @@
       scheduleRender();
     }
   });
+
+  /* ── Cover-letter preview + tab switching (Part D) ────────────────────────── */
+  function renderCover() {
+    var paper = document.getElementById('cover-paper');
+    if (!paper) return;
+    var raw = val('f-cover');
+    var d = collect();
+    var head = [];
+    if (d.name) head.push('<div style="font-size:14pt;font-weight:700;color:#1F4E79">' + esc(d.name) + '</div>');
+    var contact = [d.email, d.phone, d.location].filter(Boolean).map(esc).join('  ·  ');
+    if (contact) head.push('<div style="font-size:9.5pt;color:#57534A;margin-bottom:18px">' + contact + '</div>');
+    var paras = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+    var body = paras.map(function (p) {
+      return '<p style="margin:0 0 11px;font-size:11pt">' + esc(p).replace(/\n/g, '<br>') + '</p>';
+    }).join('');
+    paper.innerHTML = head.join('') + (body || '<p style="color:#999;text-align:center;margin-top:40px">Your cover letter preview appears here.</p>');
+  }
+
+  function showTab(which) {
+    var isCover = which === 'cover';
+    document.getElementById('preview-paper').style.display = isCover ? 'none' : 'block';
+    document.getElementById('cover-paper').style.display = isCover ? 'block' : 'none';
+    document.getElementById('tab-resume').classList.toggle('is-active', !isCover);
+    document.getElementById('tab-cover').classList.toggle('is-active', isCover);
+    if (isCover) renderCover(); else layoutPaper();
+  }
+  document.getElementById('tab-resume').addEventListener('click', function () { showTab('resume'); });
+  document.getElementById('tab-cover').addEventListener('click', function () { showTab('cover'); });
 
   /* ── Find the experience block for a slot (exact), else by role text ──────── */
   function findExpBlock(slot, roleHeader) {
