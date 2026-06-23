@@ -90,5 +90,32 @@ class PlaceableBulletsTests(unittest.TestCase):
             self.assertEqual(gen.placeable_bullets_for_skill({}, "jd", ""), [])
 
 
+class BulletsAddRouteTests(unittest.TestCase):
+    """Honesty guard on the add-bullet route, exercised without an HTTP client
+    (TestClient needs httpx, which isn't a project dependency)."""
+
+    def test_skill_ok_guard(self):
+        import app.app as appmod
+        job = {"gaps_list": ["CI/CD"], "evidence_list": ["SQL"]}
+        self.assertTrue(appmod._job_skill_ok(job, "ci/cd"))   # gap, case-insensitive
+        self.assertTrue(appmod._job_skill_ok(job, "SQL"))     # evidenced
+        self.assertFalse(appmod._job_skill_ok(job, "Witchcraft"))
+
+    def test_route_rejects_skill_not_in_job(self):
+        import app.app as appmod
+
+        fake_job = {"row_key": "abc", "role_title": "A", "company": "B",
+                    "job_text": "", "gaps_list": ["CI/CD"], "evidence_list": []}
+
+        class _Con:
+            def close(self):
+                pass
+
+        with mock.patch.object(appmod, "conn", lambda: _Con()), \
+             mock.patch.object(appmod.queries, "get_job", lambda con, rk: fake_job):
+            resp = appmod.job_editor_add_bullet("abc", skill="Witchcraft", slot="role1", text="x")
+        self.assertEqual(resp.status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

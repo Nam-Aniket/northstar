@@ -41,6 +41,34 @@ templates.env.filters["swd"] = lambda t: re.sub(r"(\d+)", r"<b>\1</b>", _html.es
 templates.env.filters["urlk"] = lambda k: urllib.parse.quote(k or "", safe="")
 templates.env.filters["domid"] = lambda k: re.sub(r"[^A-Za-z0-9_-]", "-", k or "")
 templates.env.filters["normco"] = queries.normalize_company
+
+
+def _reldate(s):
+    """Render an ISO date/datetime string as a friendly relative label."""
+    if not s:
+        return ""
+    from datetime import datetime
+    try:
+        d = datetime.fromisoformat(str(s)[:19])
+    except Exception:
+        return str(s)[:10]
+    days = (datetime.now().date() - d.date()).days
+    if days < 0:
+        return d.strftime("%b %d")
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return "%dd ago" % days
+    if days < 30:
+        return "%dw ago" % (days // 7)
+    if days < 365:
+        return "%dmo ago" % (days // 30)
+    return d.strftime("%b %Y")
+
+
+templates.env.filters["reldate"] = _reldate
 templates.env.globals["status_flow"] = queries.STATUS_FLOW
 templates.env.globals["person_status_flow"] = queries.PERSON_STATUS_FLOW
 
@@ -477,33 +505,137 @@ def insights(request: Request, sector: str = "", day: str = ""):
     return templates.TemplateResponse(request, "insights.html", ctx)
 
 
-@app.get("/people", response_class=HTMLResponse)
-def people(request: Request):
-    con = conn(); ctx = {"groups": queries.people(con)}; con.close()
-    return templates.TemplateResponse(request, "people.html", ctx)
-
-
 @app.get("/tracker", response_class=HTMLResponse)
-def tracker(request: Request):
+def tracker(request: Request, q: str = "", status: str = "", app_status: str = "",
+            needs_contacts_only: int = 0, sort: str = "activity", dir: str = "",
+            show_all: int = 0):
     con = conn()
+    groups, stats = queries.tracker_groups(
+        con,
+        q=q,
+        status=status,
+        app_status=app_status,
+        needs_contacts_only=bool(needs_contacts_only),
+        sort=sort or "activity",
+        dir=dir,
+        show_all=bool(show_all),
+    )
+    all_companies = queries.company_suggestions(con, "")
     ctx = {
-        "rows": queries.tracker_rows(con),
-        "summary": queries.tracker_summary(con),
+        "groups": groups,
+        "stats": stats,
+        "all_companies": all_companies,
+        "expand_all": bool(q or status or app_status or needs_contacts_only),
+        "f": {
+            "q": q,
+            "status": status,
+            "app_status": app_status,
+            "needs_contacts_only": needs_contacts_only,
+            "sort": sort or "activity",
+            "dir": dir,
+            "show_all": show_all,
+        },
+        "person_status_flow": queries.PERSON_STATUS_FLOW,
+        "status_flow": queries.STATUS_FLOW,
     }
     con.close()
-    return templates.TemplateResponse(request, "tracker.html", ctx)
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "_groups.html", ctx)
+    return templates.TemplateResponse(request, "contacts.html", ctx)
 
 
-@app.post("/tracker/{row_key:path}/status", response_class=HTMLResponse)
-def tracker_status(request: Request, row_key: str, value: str = Form(...)):
+@app.post("/tracker/ingest", response_class=HTMLResponse)
+def tracker_ingest(request: Request, paste: str = Form(""), company: str = Form(""),
+                   pattern: str = Form("")):
+    from linkedin_people_parser import parse_people
+    result = parse_people(paste, company, pattern)
     con = conn()
-    if value == "applied":
-        queries.set_applied(con, row_key)
-    else:
-        queries.set_status(con, row_key, value)
-    r = queries.get_tracker_row(con, row_key)
+    candidates = queries.company_suggestions(con, company)
+    company_key, company_name, match_type = queries.resolve_company(company, candidates)
+    # Merge people + needs_review (flag needs_review=1 for review items)
+    all_people = list(result.people)
+    for p in result.needs_review:
+        p2 = dict(p)
+        p2["needs_review"] = 1
+        all_people.append(p2)
+    counts = queries.ingest_people(con, company_key, company_name, all_people)
+    # Build toast
+    parts = []
+    if counts["added"]:
+        parts.append(f"Added {counts['added']}")
+    if counts["updated"]:
+        parts.append(f"updated {counts['updated']}")
+    if counts["needs_review"]:
+        parts.append(f"{counts['needs_review']} need review")
+    if counts["skipped"]:
+        parts.append(f"{counts['skipped']} skipped")
+    if match_type == "suffix" or match_type == "exact":
+        parts.append(f"linked to existing {company_name}")
+    elif match_type == "fuzzy":
+        parts.append(f"similar existing: {company_name}")
+    toast_msg = (", ".join(parts) or "No new people found") + "."
+    groups, stats = queries.tracker_groups(con)
+    all_companies = queries.company_suggestions(con, "")
+    ctx = {
+        "groups": groups,
+        "stats": stats,
+        "all_companies": all_companies,
+        "f": {
+            "q": "", "status": "", "app_status": "",
+            "needs_contacts_only": 0, "sort": "activity", "dir": "desc",
+        },
+        "person_status_flow": queries.PERSON_STATUS_FLOW,
+        "status_flow": queries.STATUS_FLOW,
+    }
     con.close()
-    return templates.TemplateResponse(request, "_tracker_row.html", {"r": r})
+    return templates.TemplateResponse(
+        request, "_groups.html", ctx,
+        headers={"HX-Trigger": json.dumps({"toast": toast_msg})}
+    )
+
+
+@app.post("/tracker/person/{person_key:path}/status", response_class=HTMLResponse)
+def tracker_person_status(request: Request, person_key: str, status: str = Form(...)):
+    con = conn()
+    queries.set_tracker_person_status(con, person_key, status)
+    person = queries.get_tracker_person(con, person_key)
+    con.close()
+    if not person:
+        return HTMLResponse("", status_code=404)
+    return templates.TemplateResponse(request, "_tperson.html",
+                                      {"p": person,
+                                       "person_status_flow": queries.PERSON_STATUS_FLOW})
+
+
+@app.post("/tracker/person/{person_key:path}/notes", response_class=HTMLResponse)
+def tracker_person_notes(request: Request, person_key: str, notes: str = Form("")):
+    con = conn()
+    queries.set_tracker_person_notes(con, person_key, notes)
+    con.close()
+    return HTMLResponse('<span class="saved-tag">Saved</span>')
+
+
+@app.post("/tracker/job/{row_key:path}/status", response_class=HTMLResponse)
+def tracker_job_status(request: Request, row_key: str, status: str = Form(...)):
+    con = conn()
+    # Reuse set_status (same path as Board's "mark applied"); it writes
+    # application_status.status + status_changed_at = now, source = 'manual'.
+    queries.set_status(con, row_key, status)
+    job = queries.get_tracker_job(con, row_key)
+    con.close()
+    if not job:
+        return HTMLResponse("", status_code=404)
+    return templates.TemplateResponse(request, "_tjob.html",
+                                      {"j": job, "status_flow": queries.STATUS_FLOW})
+
+
+@app.get("/tracker/companies", response_class=HTMLResponse)
+def tracker_companies(request: Request, q: str = ""):
+    con = conn()
+    suggestions = queries.company_suggestions(con, q)
+    con.close()
+    parts = [f'<option value="{s["company_name"]}">' for s in suggestions[:20]]
+    return HTMLResponse("\n".join(parts))
 
 
 @app.get("/builder", response_class=HTMLResponse)
@@ -548,26 +680,25 @@ def tracker_export():
     import csv
     import io
     con = conn()
-    rows = queries.tracker_rows(con)
+    rows = queries.tracker_export_rows(con)
     con.close()
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Company", "Role", "Fit %", "Status", "Applied date", "Contacts", "Job URL", "Notes"])
+    writer.writerow(["Company", "Name", "Title", "Email", "Outreach Status", "Jobs", "Notes"])
     for r in rows:
         writer.writerow([
-            r.get("company", ""),
-            r.get("role_title", ""),
-            r.get("match_score", ""),
-            r.get("status", ""),
-            r.get("applied_at", ""),
-            r.get("contacts", 0),
-            r.get("job_url", ""),
+            r.get("company_name", ""),
+            r.get("name", ""),
+            r.get("title", ""),
+            r.get("email", ""),
+            r.get("outreach_status", ""),
+            r.get("jobs_summary", ""),
             r.get("notes", ""),
         ])
     return Response(
         content=buf.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=northstar_tracker.csv"},
+        headers={"Content-Disposition": "attachment; filename=northstar_contacts.csv"},
     )
 
 
@@ -669,7 +800,7 @@ def _editor_prefill(job: dict) -> dict:
         if title_text or bullets:
             exp_role, exp_company, exp_dates = _split_slot_header(title_text)
             experiences.append({"role": exp_role, "company": exp_company,
-                                "dates": exp_dates, "bullets": bullets})
+                                "dates": exp_dates, "bullets": bullets, "slot": slot})
 
     projects = [{"name": n, "bullets": list(bs)} for n, bs in content.get("projects", [])]
 
@@ -770,7 +901,57 @@ def job_editor_add_skill(request: Request, row_key: str, label: str = Form(...))
         job = queries.get_job(con, row_key)
 
     con.close()
-    return templates.TemplateResponse(request, "_job_fit.html", {"j": job})
+    return templates.TemplateResponse(request, "_job_fit.html",
+                                      {"j": job, "claimed_skill": label})
+
+
+def _job_target(job: dict) -> dict:
+    return {"role_title": job.get("role_title", ""), "company": job.get("company", "")}
+
+
+def _job_skill_ok(job: dict, skill: str) -> bool:
+    """A skill may only be acted on if the scorer flagged it for THIS job
+    (a gap or already evidenced) - the same honesty guard as claim-skill."""
+    allowed = {s.strip().lower() for s in
+               (job.get("gaps_list", []) + job.get("evidence_list", []))}
+    return (skill or "").strip().lower() in allowed
+
+
+@app.get("/jobs/{row_key:path}/bullets", response_class=HTMLResponse)
+def job_editor_bullets(request: Request, row_key: str, skill: str = ""):
+    import generate_accepted_resumes as gen
+    con = conn(); job = queries.get_job(con, row_key); con.close()
+    if not job:
+        return HTMLResponse("Job not found", status_code=404)
+    skill = (skill or "").strip()
+    bullets = []
+    if skill and _job_skill_ok(job, skill):
+        bullets = gen.placeable_bullets_for_skill(
+            _job_target(job), job.get("job_text", "") or "", skill)
+    return templates.TemplateResponse(request, "_bullet_suggestions.html", {
+        "skill": skill, "bullets": bullets, "row_key": row_key,
+        "slots": gen.EXPERIENCE_SLOTS,
+    })
+
+
+@app.post("/jobs/{row_key:path}/bullets/add")
+def job_editor_add_bullet(row_key: str, skill: str = Form(...),
+                          slot: str = Form(...), text: str = Form(...)):
+    import generate_accepted_resumes as gen
+    con = conn(); job = queries.get_job(con, row_key); con.close()
+    if not job:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    skill = (skill or "").strip()
+    if not _job_skill_ok(job, skill):
+        return JSONResponse({"error": "skill not part of this job"}, status_code=400)
+    if slot not in {s for _, s in gen.EXPERIENCE_SLOTS}:
+        return JSONResponse({"error": "unknown role"}, status_code=400)
+    try:
+        gen.add_fact_bullet(slot, text, skill)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    header = next((h for h, s in gen.EXPERIENCE_SLOTS if s == slot), "")
+    return JSONResponse({"slot": slot, "text": text.strip(), "role_header": header})
 
 
 @app.post("/jobs/{row_key:path}/download")
