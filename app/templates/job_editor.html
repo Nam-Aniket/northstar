@@ -164,17 +164,37 @@
     return d;
   }
 
+  function bulletRow(text) {
+    var row = document.createElement('div');
+    row.className = 'bullet-row';
+    row.innerHTML =
+      '<textarea class="filter-select bullet-text" rows="2"></textarea>' +
+      '<button type="button" class="bullet-del" title="Delete this bullet">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+      '</button>';
+    row.querySelector('.bullet-text').value = text || '';
+    row.querySelector('.bullet-del').addEventListener('click', function () { row.remove(); scheduleRender(); });
+    return row;
+  }
+
   function expBlock() {
-    return rowShell('exp-block', 'remove-exp', [
+    var block = rowShell('exp-block', 'remove-exp', [
       '<div class="grid grid-cols-2 gap-3">',
         '<div class="col-span-2"><label class="filter-label">Role / heading</label>',
           '<input class="filter-select exp-role" type="text" style="padding-right:36px"></div>',
         '<div><label class="filter-label">Company</label><input class="filter-select exp-company" type="text"></div>',
         '<div><label class="filter-label">Dates</label><input class="filter-select exp-dates" type="text"></div>',
-        '<div class="col-span-2"><label class="filter-label">Bullet points (one per line)</label>',
-          '<textarea class="filter-select exp-bullets" rows="4"></textarea></div>',
+        '<div class="col-span-2"><label class="filter-label">Bullet points</label>',
+          '<div class="bullet-list"></div>',
+          '<button type="button" class="add-bullet">+ Add bullet</button>',
+        '</div>',
       '</div>',
     ].join(''));
+    block.querySelector('.add-bullet').addEventListener('click', function () {
+      block.querySelector('.bullet-list').appendChild(bulletRow(''));
+      scheduleRender();
+    });
+    return block;
   }
 
   function projBlock() {
@@ -207,11 +227,15 @@
   function collect() {
     var exps = [];
     document.querySelectorAll('.exp-block').forEach(function (b) {
+      var bullets = [];
+      b.querySelectorAll('.bullet-text').forEach(function (t) {
+        var v = t.value.trim(); if (v) bullets.push(v);
+      });
       exps.push({
         role: b.querySelector('.exp-role').value.trim(),
         company: b.querySelector('.exp-company').value.trim(),
         dates: b.querySelector('.exp-dates').value.trim(),
-        bullets: lines(b.querySelector('.exp-bullets').value),
+        bullets: bullets,
       });
     });
     var projs = [];
@@ -406,7 +430,9 @@
       if (e.role) b.querySelector('.exp-role').value = e.role;
       if (e.company) b.querySelector('.exp-company').value = e.company;
       if (e.dates) b.querySelector('.exp-dates').value = e.dates;
-      if (e.bullets && e.bullets.length) b.querySelector('.exp-bullets').value = e.bullets.join('\n');
+      if (e.slot) b.dataset.slot = e.slot;
+      var bl = b.querySelector('.bullet-list');
+      (e.bullets || []).forEach(function (txt) { bl.appendChild(bulletRow(txt)); });
     });
 
     var projList = document.getElementById('proj-list'); projList.innerHTML = '';
