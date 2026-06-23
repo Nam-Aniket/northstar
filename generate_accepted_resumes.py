@@ -44,6 +44,7 @@ import difflib
 import json
 import re
 import sys
+import threading
 import zipfile
 from collections import Counter
 from datetime import date
@@ -219,6 +220,77 @@ if _facts_override:
     FACT_BANK = _facts_override["FACT_BANK"]
     BULLET_BUDGETS = _facts_override["BULLET_BUDGETS"]
     EXPERIENCE_SLOTS = [tuple(s) for s in _facts_override["EXPERIENCE_SLOTS"]]
+
+
+FACTS_LOCK = threading.Lock()
+
+
+def _current_facts_dict() -> dict:
+    """Snapshot the in-memory banks as a facts.json-shaped dict."""
+    return {
+        "FACT_BANK": FACT_BANK,
+        "EXPERIENCE_SLOTS": [list(s) for s in EXPERIENCE_SLOTS],
+        "BULLET_BUDGETS": BULLET_BUDGETS,
+    }
+
+
+def reload_facts() -> None:
+    """Re-read facts.json into the module globals (mirrors config.reset_banks
+    for skills.json). After a write, the next build_content sees the new bullet."""
+    global FACT_BANK, EXPERIENCE_SLOTS, BULLET_BUDGETS
+    ov = config.load_facts_override()
+    if ov:
+        FACT_BANK = ov["FACT_BANK"]
+        BULLET_BUDGETS = ov["BULLET_BUDGETS"]
+        EXPERIENCE_SLOTS = [tuple(s) for s in ov["EXPERIENCE_SLOTS"]]
+
+
+def add_fact_bullet(slot: str, text: str, skill: str) -> dict:
+    """Append a user-authored bullet to FACT_BANK[slot] in facts.json, tagged
+    with `skill`, then reload. Honest-by-construction: the caller picks the real
+    role the bullet belongs to. Returns the saved {text, evidences} entry."""
+    from facts_bridge import save_facts
+
+    text = (text or "").strip()
+    slot = (slot or "").strip()
+    if not text:
+        raise ValueError("empty bullet text")
+    if slot not in {s for _, s in EXPERIENCE_SLOTS}:
+        raise ValueError(f"unknown slot: {slot}")
+
+    with FACTS_LOCK:
+        facts = config.load_facts_override() or _current_facts_dict()
+        bank = facts.setdefault("FACT_BANK", {})
+        pool = bank.setdefault(slot, [])
+        existing = next((b for b in pool if b.get("text", "").strip() == text), None)
+        if existing is None:
+            entry = {"text": text, "evidences": [skill] if skill else []}
+            pool.append(entry)
+        else:
+            entry = existing
+            if skill and skill not in entry.get("evidences", []):
+                entry.setdefault("evidences", []).append(skill)
+        save_facts(facts, config.ROOT)
+        reload_facts()
+    return entry
+
+
+def placeable_bullets_for_skill(target: dict, jd_text: str, skill: str) -> list[dict]:
+    """Fact-bank bullets that evidence `skill` and are NOT already selected for
+    this job, each tagged with the slot + role header it belongs to.
+    Returns [{"slot": str, "role_header": str, "text": str}]."""
+    skill_lc = (skill or "").strip().lower()
+    if not skill_lc:
+        return []
+    selected = build_content(target, jd_text).get("bullets_by_slot", {})
+    out: list[dict] = []
+    for header, slot in EXPERIENCE_SLOTS:
+        sel = set(selected.get(slot, []))
+        for b in FACT_BANK.get(slot, []):
+            ev = {e.strip().lower() for e in b.get("evidences", [])}
+            if skill_lc in ev and b.get("text") not in sel:
+                out.append({"slot": slot, "role_header": header, "text": b["text"]})
+    return out
 
 
 def select_bullets(slot: str, jd_hits: Dict[str, Dict]) -> List[Dict]:
