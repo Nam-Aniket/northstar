@@ -16,9 +16,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import db, locations as app_locations, queries
+from app import db, locations as app_locations, queries, relevance
 
 import config
+
+# Override dropdown values -> seniority cap rank. "" / "auto" = derive from tracked roles.
+_LEVEL_OVERRIDE = {"entry": 1, "mid": 2, "senior": 3}
 
 ROOT = Path(__file__).resolve().parent.parent
 RESUME_DIR = ROOT / "resumes"
@@ -91,7 +94,7 @@ def _card(request, job):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
          status: str = "", show_dismissed: int = 0, starred: int = 0,
-         view: str = "", day: str = ""):
+         view: str = "", day: str = "", everything: int = 0, level: str = ""):
     con = conn()
     days = queries.available_days(con)
     # Default to the newest day so the board lands on today's batch after a Run;
@@ -108,6 +111,16 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         jobs = queries.get_jobs(con, q=q or None, sector=sector or None, min_score=min_score,
                                 status=status or None, show_dismissed=bool(show_dismissed),
                                 starred_only=bool(starred), view=view or None, day=None)
+
+    # "For me" smart view: default board only, unless the user clicked "Show everything".
+    for_me_active = (view in ("", None)) and not everything
+    hidden_count = 0
+    if for_me_active:
+        profile = relevance.target_profile(con)
+        override = _LEVEL_OVERRIDE.get(level)  # None when level is "" / "auto" / unknown
+        before = len(jobs)
+        jobs = relevance.apply_for_me_view(jobs, profile, override_rank=override)
+        hidden_count = before - len(jobs)
 
     # prev/next day navigation (days is descending: index 0 = newest)
     if current_day and current_day != "all" and current_day in days:
@@ -129,8 +142,12 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         "sectors": queries.sectors(con),
         "f": {"q": q, "sector": sector, "min_score": min_score, "status": status,
               "show_dismissed": show_dismissed, "starred": starred,
-              "view": view, "day": current_day},
+              "view": view, "day": current_day, "everything": everything, "level": level},
         "view": view,
+        "for_me_active": for_me_active,
+        "hidden_count": hidden_count,
+        "everything": everything,
+        "level": level,
         "days": days,
         "current_day": current_day,
         "prev_day": prev_day,
