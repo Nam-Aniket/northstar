@@ -4,8 +4,16 @@ Covers the fact-bank writer (write-once persistence + in-process reload), the
 placeable-bullet computation, and the honesty guard on the add-bullet route.
 Uses unittest to match the rest of the suite.
 """
-import json
 import os
+
+# Force the PII-free example banks before importing config/gen, so the suite is
+# deterministic regardless of which test module imports generate_accepted_resumes
+# first (mirrors test_ats_engine.py). setdefault leaves any caller-set value.
+os.environ.setdefault("JOBENGINE_SKILLS", "skills.example.json")
+os.environ.setdefault("JOBENGINE_CONFIG", "config.example.json")
+os.environ.setdefault("JOBENGINE_FACTS", "facts.example.json")
+
+import json
 import tempfile
 import unittest
 from pathlib import Path
