@@ -1,7 +1,7 @@
 {# ── _tperson.html — single person sub-row inside a company group ─────────── #}
 {# Called with p = tracker_people dict, person_status_flow in context          #}
 {% set st = p.outreach_status or 'not_contacted' %}
-<div class="tperson" id="tperson-{{ p.person_key|domid }}">
+<div class="tperson" id="tperson-{{ p.person_key|domid }}" data-email="{{ p.email or '' }}">
 
   {# name + review badge #}
   <div class="tperson__name">

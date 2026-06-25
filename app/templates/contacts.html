@@ -102,6 +102,7 @@
              hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
              hx-trigger="change" hx-include="closest .ttoolbar">
       Needs contacts
+      <span class="chip" style="margin-left:5px">{{ stats.companies_with_people }}/{{ stats.total_companies }} have contacts</span>
     </label>
     <label class="toggle-row" style="padding-bottom:4px">
       <input type="checkbox" name="show_all" value="1"

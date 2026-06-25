@@ -507,10 +507,13 @@ def tracker_groups(con, q='', status='', app_status='', needs_contacts_only=Fals
         if (p.get("created_at") or "") >= week_ago
     )
 
+    companies_with_people = sum(1 for ck in companies if people_by_company.get(ck))
+
     stats = {
         "total_companies": total_companies,
         "companies_contacted": companies_contacted,
         "companies_applied": companies_applied,
+        "companies_with_people": companies_with_people,
         "people_total": people_total,
         "added_this_week": added_this_week,
         "archived_count": archived_count,
@@ -1061,6 +1064,27 @@ def company_detail(con, company_key: str) -> dict:
     for p in con.execute("SELECT * FROM manual_people WHERE company_key=?", (company_key,)):
         if p["person_key"] not in seen_keys:
             people_rows.append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr, is_manual=True))
+            seen_keys.add(p["person_key"])
+    # Unified contact store: the LinkedIn-People ingest writes tracker_people, which
+    # the legacy company view never read (the Prophix-shows-0-contacts bug).
+    for p in con.execute("SELECT * FROM tracker_people WHERE company_key=?", (company_key,)):
+        if p["person_key"] in seen_keys:
+            continue
+        seen_keys.add(p["person_key"])
+        people_rows.append({
+            "person_key":      p["person_key"],
+            "company_key":     p["company_key"],
+            "name":            p["name"],
+            "role":            p["title"] or "",
+            "email":           p["email"] or "",
+            "has_email":       bool(p["email"]),
+            "linkedin_url":    "",
+            "draft_state":     "",
+            "replied":         False,
+            "outreach_status": p["outreach_status"] or "not_contacted",
+            "contacted_at":    "",
+            "is_manual":       False,
+        })
     # Fetch scored jobs whose normalized company matches this company_key
     job_rows = [
         _shape(r) for r in con.execute(JOB_SELECT).fetchall()
