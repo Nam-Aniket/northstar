@@ -7,7 +7,7 @@
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('ns-theme')||'warm'}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
@@ -21,7 +21,7 @@
         leaf:'rgb(var(--c-good)/<alpha-value>)', leafsoft:'rgb(var(--c-good-soft)/<alpha-value>)',
         gold:'rgb(var(--c-warn)/<alpha-value>)', goldsoft:'rgb(var(--c-warn-soft)/<alpha-value>)',
       },
-      fontFamily: { sans:['Urbanist','Helvetica Neue','Arial','sans-serif'], display:['Urbanist','Helvetica Neue','Arial','sans-serif'] },
+      fontFamily: { sans:['Urbanist','Helvetica Neue','Arial','sans-serif'], display:['Chakra Petch','Urbanist','Helvetica Neue','Arial','sans-serif'] },
     }}}
   </script>
   <link rel="stylesheet" href="/static/app.css">
@@ -37,8 +37,7 @@
       <nav class="ns-nav">
         <a href="/" class="navlink {{ 'active' if path == '/' }}">Board</a>
         <a href="/insights" class="navlink {{ 'active' if path == '/insights' }}">Insights</a>
-        <a href="/people" class="navlink {{ 'active' if path == '/people' or path.startswith('/company') }}">People</a>
-        <a href="/tracker" class="navlink {{ 'active' if path == '/tracker' }}">Tracker</a>
+        <a href="/tracker" class="navlink {{ 'active' if path == '/tracker' or path.startswith('/company') }}">Tracker</a>
         <a href="/builder" class="navlink {{ 'active' if path == '/builder' }}">Builder</a>
         <a href="/onboarding" class="navlink {{ 'active' if path == '/onboarding' }}">Setup</a>
       </nav>

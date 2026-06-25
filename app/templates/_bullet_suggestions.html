@@ -1,0 +1,28 @@
+{# Placeable evidence bullets for a claimed skill. Either Add-cards (bullets the
+   user already wrote, tagged with this skill) or a write-once box when none exist.
+   data-target-slot drives exact placement into the matching experience block. #}
+<div class="bullet-suggest" data-skill="{{ skill }}">
+  {% if bullets %}
+  <p class="text-xs uppercase tracking-wide text-muted mb-1.5">Evidence for "{{ skill }}"</p>
+  <p class="text-xs text-muted mb-2">Add a real bullet you wrote into the role it belongs to.</p>
+  {% for b in bullets %}
+  <div class="suggest-card" data-add-bullet="{{ b.text }}" data-target-slot="{{ b.slot }}">
+    <div class="suggest-role">{{ b.role_header }}</div>
+    <div class="suggest-text">{{ b.text }}</div>
+    <button type="button" class="suggest-add btn-apply">Add to resume</button>
+  </div>
+  {% endfor %}
+  {% elif skill %}
+  <p class="text-xs uppercase tracking-wide text-muted mb-1.5">No evidence bullet yet for "{{ skill }}"</p>
+  <p class="text-xs text-muted mb-2">Write one in your own words. It saves to your fact bank for future jobs too.</p>
+  <form class="writeonce" data-skill="{{ skill }}" data-row="{{ row_key }}">
+    <textarea class="filter-select wo-text" rows="2"
+              placeholder="e.g. Built CI/CD pipelines in GitHub Actions, cutting deploy time 40%."></textarea>
+    <label class="filter-label" style="margin-top:8px;display:block">Which role does this belong to?{% if suggested_slot %} <span class="text-leaf">(suggested for you)</span>{% endif %}</label>
+    <select class="filter-select wo-slot">
+      {% for header, slot in slots %}<option value="{{ slot }}"{% if slot == suggested_slot %} selected{% endif %}>{{ header }}</option>{% endfor %}
+    </select>
+    <button type="button" class="wo-save btn-apply" style="margin-top:8px">Save &amp; add</button>
+  </form>
+  {% endif %}
+</div>

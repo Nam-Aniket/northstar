@@ -1,0 +1,113 @@
+{% if row.is_placeholder %}
+{# ── Placeholder row: company has jobs but no contacts ─────────────────────── #}
+<tr class="crow crow--amber" id="crow-{{ row.person_key|domid }}"
+    data-company="{{ row.company_name|e }}">
+  <td colspan="2">
+    <span style="font-size:15px;margin-right:6px">&#10071;</span>
+    <span style="font-weight:600;color:rgb(var(--c-ink))">Jobs found — no contacts yet.</span>
+    <button type="button" class="add-people-link" data-add-people data-company="{{ row.company_name|e }}"
+            style="background:none;border:none;padding:0;margin-left:6px;font-size:12px;font-weight:600;color:rgb(var(--c-accent));cursor:pointer">Add people →</button>
+  </td>
+  <td>
+    <a href="/company/{{ row.company_key|urlk }}" onclick="event.stopPropagation()" style="font-weight:600">{{ row.company_name }}</a>
+  </td>
+  <td>
+    {% if row.jobs|length == 1 %}
+      <span style="font-size:12px;color:rgb(var(--c-ink2))">{{ row.jobs[0].role_title }}</span>
+    {% else %}
+      <details>
+        <summary style="cursor:pointer;font-size:12px;color:rgb(var(--c-muted))">{{ row.jobs|length }} jobs ▾</summary>
+        <ul style="margin:6px 0 0 0;padding:0;list-style:none">
+          {% for j in row.jobs %}
+          <li style="font-size:11.5px;color:rgb(var(--c-ink2));padding:2px 0">{{ j.role_title }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </td>
+  <td colspan="3" style="color:rgb(var(--c-muted));font-size:12px">—</td>
+</tr>
+{% else %}
+{# ── Normal person row ────────────────────────────────────────────────────── #}
+{% set color_class = "crow--green" if row.color == "green" else ("crow--blue" if row.color == "blue" else "crow--gray") %}
+<tr class="crow {{ color_class }}" id="crow-{{ row.person_key|domid }}" data-company="{{ row.company_name|e }}">
+  <td>
+    <span style="font-weight:600;color:rgb(var(--c-ink))">{{ row.name }}</span>
+    {% if row.needs_review %}
+    <span class="badge muted" style="font-size:10px;margin-left:4px">review</span>
+    {% endif %}
+  </td>
+  <td style="color:rgb(var(--c-ink2));font-size:12.5px">{{ row.title or '—' }}</td>
+  <td>
+    {% if row.company_key %}
+    <a href="/company/{{ row.company_key|urlk }}">{{ row.company_name or row.company_key }}</a>
+    {% else %}
+    {{ row.company_name or '—' }}
+    {% endif %}
+  </td>
+  <td>
+    {% if row.jobs %}
+      {% if row.jobs|length == 1 %}
+        {% set j = row.jobs[0] %}
+        <span style="font-size:12px;color:rgb(var(--c-ink2))">{{ j.role_title }}</span>
+        <select name="status" style="margin-left:6px;font-size:11px;padding:2px 6px;border-radius:8px;border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));cursor:pointer"
+                hx-post="/tracker/job/{{ j.row_key|urlk }}/status"
+                hx-swap="none"
+                hx-trigger="change">
+          {% for st in status_flow %}
+          <option value="{{ st }}" {{ 'selected' if j.app_status == st }}>{{ st.replace('_',' ')|title }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <details>
+          <summary style="cursor:pointer;font-size:12px;color:rgb(var(--c-muted))">{{ row.jobs|length }} jobs ▾</summary>
+          <ul style="margin:6px 0 0 0;padding:0;list-style:none">
+            {% for j in row.jobs %}
+            <li style="padding:3px 0;display:flex;align-items:center;gap:6px">
+              <span style="font-size:11.5px;color:rgb(var(--c-ink2))">{{ j.role_title }}</span>
+              <select name="status" style="font-size:11px;padding:2px 5px;border-radius:6px;border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));cursor:pointer"
+                      hx-post="/tracker/job/{{ j.row_key|urlk }}/status"
+                      hx-swap="none"
+                      hx-trigger="change">
+                {% for st in status_flow %}
+                <option value="{{ st }}" {{ 'selected' if j.app_status == st }}>{{ st.replace('_',' ')|title }}</option>
+                {% endfor %}
+              </select>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
+    {% else %}
+      <span style="color:rgb(var(--c-muted));font-size:12px">—</span>
+    {% endif %}
+  </td>
+  <td>
+    {% set st = row.outreach_status or 'not_contacted' %}
+    <select name="status" class="filter-select" style="width:auto;padding:4px 8px;font-size:12px"
+            hx-post="/tracker/person/{{ row.person_key|urlk }}/status"
+            hx-target="#crow-{{ row.person_key|domid }}"
+            hx-swap="outerHTML"
+            hx-trigger="change">
+      {% for s in person_status_flow %}
+      <option value="{{ s }}" {{ 'selected' if st == s }}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+  </td>
+  <td style="font-size:12px;color:rgb(var(--c-ink2))">
+    {% if row.email %}
+    <a href="mailto:{{ row.email }}" style="color:rgb(var(--c-ink2))">{{ row.email }}</a>
+    {% else %}
+    —
+    {% endif %}
+  </td>
+  <td>
+    <input type="text" name="notes" value="{{ row.notes or '' }}"
+           placeholder="add note…"
+           style="width:100%;font-size:12px;padding:4px 7px;border-radius:8px;border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink))"
+           hx-post="/tracker/person/{{ row.person_key|urlk }}/notes"
+           hx-trigger="change, blur"
+           hx-swap="none">
+  </td>
+</tr>
+{% endif %}

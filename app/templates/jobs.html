@@ -48,6 +48,7 @@
           class="panel p-4 flex flex-col gap-5">
       <input type="hidden" name="day" value="{{ f.day }}">
       <input type="hidden" name="view" value="{{ f.view }}">
+      <input type="hidden" name="everything" value="{{ f.everything }}">
       <div>
         <label for="q" class="filter-label flex items-center gap-2">Search <span id="filter-spin" class="htmx-indicator spinner" style="width:11px;height:11px;color:rgb(var(--c-accent))" aria-hidden="true"></span></label>
         <div class="relative">
@@ -58,6 +59,15 @@
       <div>
         <label for="min_score" class="filter-label flex justify-between">Minimum score <span class="text-clay font-semibold" id="scoreval">{{ f.min_score }}</span></label>
         <input id="min_score" name="min_score" type="range" min="0" max="100" step="5" value="{{ f.min_score }}" oninput="document.getElementById('scoreval').textContent=this.value" class="w-full accent-clay cursor-pointer">
+      </div>
+      <div>
+        <label for="fresh" class="filter-label">Posted</label>
+        <select id="fresh" name="fresh" class="filter-select">
+          <option value="" {{ 'selected' if not f.fresh }}>Any time</option>
+          <option value="1h" {{ 'selected' if f.fresh=='1h' }}>Past hour</option>
+          <option value="4h" {{ 'selected' if f.fresh=='4h' }}>Past 4 hours</option>
+          <option value="24h" {{ 'selected' if f.fresh=='24h' }}>Past 24 hours</option>
+        </select>
       </div>
       <div>
         <label for="sector" class="filter-label">Sector</label>
@@ -71,6 +81,15 @@
         <select id="status" name="status" class="filter-select">
           <option value="">Any stage</option>
           {% for st in ['new','applied','phone_screen','interview','offer','rejected'] %}<option value="{{ st }}" {{ 'selected' if f.status==st }}>{{ st.replace('_',' ')|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="level" class="filter-label">Seniority cap</label>
+        <select id="level" name="level" class="filter-select">
+          <option value="" {{ 'selected' if not f.level }}>Auto (from your roles)</option>
+          <option value="entry" {{ 'selected' if f.level=='entry' }}>Entry &amp; below</option>
+          <option value="mid" {{ 'selected' if f.level=='mid' }}>Mid &amp; below</option>
+          <option value="senior" {{ 'selected' if f.level=='senior' }}>Senior &amp; below</option>
         </select>
       </div>
       <div class="flex flex-col gap-2.5 pt-1 border-t border-line">

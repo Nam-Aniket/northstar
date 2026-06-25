@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Tracker · Northstar{% endblock %}
+{% block content %}
+
+{# ── Scoreboard header ──────────────────────────────────────────────────────── #}
+<div class="flex flex-wrap items-end justify-between gap-4 mb-5 reveal">
+  <div>
+    <h1 class="page-h">Tracker</h1>
+    <p class="page-sub">people-centric outreach board</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/tracker/export" class="btn-open" download>
+      <svg viewBox="0 0 24 24" class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export .csv
+    </a>
+  </div>
+</div>
+
+{# ── Calm progress bar + stat chips ────────────────────────────────────────── #}
+<div class="panel reveal" style="padding:20px 24px;margin-bottom:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap">
+    <div>
+      <span style="font-size:13px;font-weight:600;color:rgb(var(--c-ink2))">Companies contacted</span>
+      <span style="font-size:13px;color:rgb(var(--c-muted));margin-left:6px">
+        {{ stats.companies_contacted }} of {{ stats.total_companies }}
+      </span>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <div class="kpi tip" style="min-width:120px;padding:14px 18px">
+        <div class="l">People</div>
+        <div class="v">{{ stats.people_total }}</div>
+        <span class="tip__bubble">Total people tracked across all companies.</span>
+      </div>
+      <div class="kpi tip" style="min-width:120px;padding:14px 18px">
+        <div class="l">Applied</div>
+        <div class="v" style="color:rgb(var(--c-good-ink))">{{ stats.companies_applied }}</div>
+        <span class="tip__bubble">Companies where you have at least one application in progress.</span>
+      </div>
+      <div class="kpi tip" style="min-width:120px;padding:14px 18px">
+        <div class="l">Added this week</div>
+        <div class="v">{{ stats.added_this_week }}</div>
+        <span class="tip__bubble">People added in the last 7 days.</span>
+      </div>
+    </div>
+  </div>
+  {# progress bar #}
+  {% if stats.total_companies > 0 %}
+    {% set pct = (stats.companies_contacted / stats.total_companies * 100)|int %}
+  {% else %}
+    {% set pct = 0 %}
+  {% endif %}
+  <div class="tprogress" role="progressbar"
+       aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"
+       aria-label="{{ stats.companies_contacted }} of {{ stats.total_companies }} companies contacted">
+    <div class="tprogress__fill" style="width:{{ pct }}%"></div>
+  </div>
+</div>
+
+{# ── Sticky toolbar ─────────────────────────────────────────────────────────── #}
+<div class="ttoolbar reveal">
+
+  <div>
+    <label for="tb-q" class="filter-label">Search</label>
+    <input id="tb-q" type="text" name="q" value="{{ f.q }}"
+           placeholder="Company or person…"
+           class="filter-select" style="max-width:220px"
+           hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+           hx-trigger="keyup changed delay:300ms"
+           hx-include="closest .ttoolbar">
+  </div>
+
+  <div>
+    <label for="tb-status" class="filter-label">Outreach</label>
+    <select id="tb-status" name="status" class="filter-select"
+            hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="closest .ttoolbar">
+      <option value="">All outreach</option>
+      {% for s in person_status_flow %}
+      <option value="{{ s }}" {{ 'selected' if f.status == s }}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div>
+    <label for="tb-app-status" class="filter-label">Application</label>
+    <select id="tb-app-status" name="app_status" class="filter-select"
+            hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="closest .ttoolbar">
+      <option value="">All stages</option>
+      {% for s in status_flow %}
+      <option value="{{ s }}" {{ 'selected' if f.app_status == s }}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div style="display:flex;align-items:flex-end;gap:16px">
+    <label class="toggle-row" style="padding-bottom:4px">
+      <input type="checkbox" name="needs_contacts_only" value="1"
+             {{ 'checked' if f.needs_contacts_only }}
+             hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+             hx-trigger="change" hx-include="closest .ttoolbar">
+      Needs contacts
+    </label>
+    <label class="toggle-row" style="padding-bottom:4px">
+      <input type="checkbox" name="show_all" value="1"
+             {{ 'checked' if f.show_all }}
+             hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+             hx-trigger="change" hx-include="closest .ttoolbar">
+      Show all{% if stats.archived_count and not f.show_all %}
+        <span class="chip" style="margin-left:5px">{{ stats.archived_count }} hidden</span>{% endif %}
+    </label>
+  </div>
+
+  <div>
+    <label for="tb-sort" class="filter-label">Sort</label>
+    <select id="tb-sort" name="sort" class="filter-select"
+            hx-get="/tracker" hx-target="#contacts-table" hx-swap="innerHTML"
+            hx-trigger="change"
+            hx-include="closest .ttoolbar">
+      <option value="activity"  {{ 'selected' if f.sort == 'activity' }}>Recent activity</option>
+      <option value="added"     {{ 'selected' if f.sort == 'added' }}>Date added</option>
+      <option value="company"   {{ 'selected' if f.sort == 'company' }}>Company A–Z</option>
+      <option value="fit"       {{ 'selected' if f.sort == 'fit' }}>Fit score</option>
+      <option value="applied"   {{ 'selected' if f.sort == 'applied' }}>Applied count</option>
+    </select>
+  </div>
+
+</div>{# /.ttoolbar #}
+
+{# ── Groups container (HTMX swap target) ───────────────────────────────────── #}
+<div id="contacts-table" style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+  {% include "_groups.html" %}
+</div>
+
+{# ── Slide-over drawer ──────────────────────────────────────────────────────── #}
+{# IMPORTANT: drawer-toggle and ingest-company ids must stay identical.          #}
+{# The ingest form targets #contacts-table → innerHTML on submit.                 #}
+{% include "_ingest_drawer.html" %}
+
+{# ── Delegated JS — survives HTMX swaps (bound to document + #contacts-table) ── #}
+<script>
+(function () {
+  var companyInput = document.getElementById('ingest-company');
+  var pasteInput   = document.getElementById('ingest-paste');
+  var toggle       = document.getElementById('drawer-toggle');
+
+  function openDrawer(company) {
+    if (company && companyInput) companyInput.value = company;
+    if (toggle) toggle.checked = true;
+    if (pasteInput) setTimeout(function () { pasteInput.focus(); }, 60);
+  }
+
+  // Expand/collapse groups — delegated on document so it survives HTMX swaps
+  document.addEventListener('click', function (e) {
+    // "Add people" buttons (header + nudge rows)
+    var adder = e.target.closest('[data-add-people]');
+    if (adder) {
+      e.stopPropagation();
+      openDrawer(adder.dataset.company || '');
+      return;
+    }
+
+    // Group header toggle — ignore clicks on interactive elements
+    var head = e.target.closest('[data-tgroup-toggle]');
+    if (!head) return;
+    if (e.target.closest('a, select, input, button, summary, textarea, label, option')) return;
+
+    var expanded = head.getAttribute('aria-expanded') === 'true';
+    head.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    var bodyId = head.getAttribute('aria-controls');
+    if (bodyId) {
+      var body = document.getElementById(bodyId);
+      if (body) body.classList.toggle('is-open', !expanded);
+    }
+  });
+
+  // Keyboard: Enter/Space on group header
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var head = e.target.closest('[data-tgroup-toggle]');
+    if (!head) return;
+    e.preventDefault();
+    head.click();
+  });
+})();
+</script>
+
+{% endblock %}

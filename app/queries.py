@@ -6,10 +6,12 @@ import html as _html
 import json
 import os
 import re
+import difflib
 import threading
 from pathlib import Path
 
 from app import db
+from app import freshness
 
 # Serialises the editor's claim-a-skill path (add_supported_skill -> reset_banks
 # -> rescore_job). FastAPI runs sync routes in a threadpool, so two near-
@@ -50,6 +52,654 @@ def slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", (s or "").lower()).strip("_")
 
 
+
+
+def company_core(name: str) -> str:
+    """
+    Normalize company name to a core for fuzzy matching.
+    Strips punctuation, normalizes whitespace, and removes legal entity suffixes.
+    """
+    # Normalize: lowercase + strip punctuation + normalize whitespace
+    s = (name or "").lower()
+    # Remove punctuation
+    s = re.sub(r"[.,&]", " ", s)
+    # Normalize whitespace
+    s = re.sub(r"\s+", " ", s).strip()
+    
+    # Strip legal/entity suffix tokens
+    suffix_tokens = {
+        "pty", "ltd", "limited", "pvt", "private", "inc", "incorporated",
+        "llc", "corp", "corporation", "co", "company", "gmbh", "ag", "sa",
+        "plc", "group", "holdings", "technologies", "technology", "labs",
+        "software", "solutions", "systems"
+    }
+    
+    tokens = s.split()
+    # Remove trailing suffix tokens
+    while tokens and tokens[-1] in suffix_tokens:
+        tokens.pop()
+    
+    result = " ".join(tokens)
+    # Convert to slugify form (spaces -> underscores)
+    return slugify(result)
+
+
+def resolve_company(typed: str, candidates: list) -> tuple:
+    """
+    Resolve a typed company name to the best matching company key.
+    Returns (company_key, company_name, match_type).
+    
+    Match types: "exact", "suffix", "fuzzy", "new"
+    """
+    if not candidates:
+        return (slugify(typed), typed, "new")
+    
+    typed_normalized = normalize_company(typed)
+    typed_core = company_core(typed)
+    
+    # 1. Exact match
+    for cand in candidates:
+        if normalize_company(cand.get("company_name", "")) == typed_normalized:
+            return (cand["company_key"], cand["company_name"], "exact")
+    
+    # 2. Suffix match (core equality)
+    if typed_core:  # Only if non-empty core
+        for cand in candidates:
+            cand_core = company_core(cand.get("company_name", ""))
+            if typed_core == cand_core and cand_core:
+                return (cand["company_key"], cand["company_name"], "suffix")
+    
+    # 3. Fuzzy match (difflib >= 0.90)
+    if typed_core:
+        best_ratio = 0
+        best_match = None
+        for cand in candidates:
+            cand_core = company_core(cand.get("company_name", ""))
+            if not cand_core:
+                continue
+            ratio = difflib.SequenceMatcher(None, typed_core, cand_core).ratio()
+            if ratio >= 0.90 and ratio > best_ratio:
+                best_ratio = ratio
+                best_match = cand
+        
+        if best_match:
+            # Fuzzy match: suggestion but not auto-linked
+            return (best_match["company_key"], best_match["company_name"], "fuzzy")
+    
+    # 4. New company
+    return (slugify(typed), typed, "new")
+
+
+def ingest_people(con, company_key: str, company_name: str, people: list) -> dict:
+    """
+    Upsert people into tracker_people.
+    ON CONFLICT omits outreach_status and notes (preserves workflow state).
+    
+    Returns {added, updated, needs_review, skipped}.
+    """
+    now = _now()
+    added = 0
+    updated = 0
+    needs_review = 0
+    skipped = 0
+    
+    seen_emails = set()
+    
+    for person in people:
+        name = person.get("name", "")
+        title = person.get("title", "")
+        email = person.get("email", "")
+        is_review = person.get("needs_review", 0)
+        pattern = person.get("pattern", "")
+        
+        if not name or not email:
+            continue
+        
+        # Dedup within paste on email
+        if email in seen_emails:
+            skipped += 1
+            continue
+        seen_emails.add(email)
+        
+        # Check if email already exists under same company
+        existing = con.execute(
+            "SELECT person_key FROM tracker_people WHERE email = ? AND company_key = ?",
+            (email, company_key)
+        ).fetchone()
+        
+        if existing:
+            # Update: refresh title/email/pattern but preserve status/notes
+            con.execute("""
+                UPDATE tracker_people
+                SET title = ?, pattern = ?, updated_at = ?
+                WHERE email = ? AND company_key = ?
+            """, (title, pattern, now, email, company_key))
+            updated += 1
+        else:
+            # Insert new
+            person_key = f"{company_key}|{slugify(name)}"
+            con.execute("""
+                INSERT OR IGNORE INTO tracker_people
+                (person_key, company_key, company_name, name, title, email, pattern,
+                 outreach_status, notes, needs_review, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                person_key, company_key, company_name, name, title, email, pattern,
+                "not_contacted", "", is_review, now, now
+            ))
+            added += 1
+            if is_review:
+                needs_review += 1
+    
+    con.commit()
+    return {"added": added, "updated": updated, "needs_review": needs_review, "skipped": skipped}
+
+
+def tracker_table(con, q=None, company=None, status=None, sort=None, dir=None) -> list[dict]:
+    """
+    Load tracker_people with jobs attached. Filter and sort.
+    Emit one placeholder row per company with jobs but no people.
+    """
+    # Load all tracker_people
+    rows = con.execute("""
+        SELECT person_key, company_key, company_name, name, title, email,
+               outreach_status, notes, needs_review
+        FROM tracker_people
+        ORDER BY company_key, name
+    """).fetchall()
+    
+    people_rows = [dict(r) for r in rows]
+    
+    # Build company -> jobs map
+    jobs_by_company = {}
+    jobs_rows = con.execute("""
+        SELECT j.row_key, j.company, j.role_title,
+               a.status AS app_status
+        FROM jobs j
+        LEFT JOIN application_status a ON j.row_key = a.row_key
+    """).fetchall()
+    
+    for job in jobs_rows:
+        company_name = job["company"]
+        company_key = normalize_company(company_name)
+        if company_key not in jobs_by_company:
+            jobs_by_company[company_key] = []
+        jobs_by_company[company_key].append({
+            "row_key": job["row_key"],
+            "company": company_name,
+            "role_title": job["role_title"],
+            "app_status": job["app_status"] or "new"
+        })
+    
+    # Attach jobs to people and apply filters
+    result = []
+    companies_with_people = set()
+    
+    for person in people_rows:
+        person["is_placeholder"] = False
+        person["jobs"] = jobs_by_company.get(person["company_key"], [])
+        companies_with_people.add(person["company_key"])
+        
+        # Apply filters
+        if q and q.lower() not in person["name"].lower():
+            continue
+        if company and person["company_key"] != company:
+            continue
+        if status and person["outreach_status"] != status:
+            continue
+        
+        result.append(person)
+    
+    # Add placeholder rows for companies with jobs but no people
+    for company_key, jobs in jobs_by_company.items():
+        if company_key not in companies_with_people:
+            # Get first job to extract display name
+            display_name = jobs[0].get("company", company_key) if jobs else company_key
+            placeholder = {
+                "person_key": f"{company_key}|_placeholder",
+                "company_key": company_key,
+                "company_name": display_name,
+                "name": f"[{len(jobs)} job{'s' if len(jobs) > 1 else ''}]",
+                "title": "",
+                "email": "",
+                "outreach_status": "not_contacted",
+                "notes": "",
+                "needs_review": 0,
+                "is_placeholder": True,
+                "jobs": jobs
+            }
+            
+            # Apply company filter to placeholder too
+            if company and company_key != company:
+                continue
+            
+            result.append(placeholder)
+    
+    # Sort (basic: by name or company)
+    if sort == "company":
+        result.sort(key=lambda x: x["company_key"], reverse=(dir == "desc"))
+    else:
+        result.sort(key=lambda x: x["name"], reverse=(dir == "desc"))
+    
+    return result
+
+
+def tracker_groups(con, q='', status='', app_status='', needs_contacts_only=False,
+                   sort='activity', dir='', show_all=False):
+    """Return (groups, stats) for the grouped Tracker view.
+
+    Each group:
+      company_key, company_name, people[], jobs[],
+      people_count, jobs_count, applied_count, contacted_count,
+      group_status, last_activity, is_placeholder
+
+    stats:
+      total_companies, companies_contacted, companies_applied,
+      people_total, added_this_week
+    """
+    import datetime as _dt
+
+    now_str = _now()
+    week_ago = (_dt.datetime.now() - _dt.timedelta(days=7)).isoformat(timespec="seconds")
+
+    # ── 1. Collect all companies ─────────────────────────────────────────────
+    # Company universe = tracker_people OR jobs (same as company_suggestions)
+    companies: dict[str, dict] = {}  # company_key -> {company_key, company_name}
+
+    for r in con.execute(
+        "SELECT DISTINCT company_key, company_name FROM tracker_people"
+    ).fetchall():
+        k = r["company_key"]
+        if k and k not in companies:
+            companies[k] = {"company_key": k, "company_name": r["company_name"] or k}
+
+    for r in con.execute(
+        "SELECT DISTINCT company FROM jobs WHERE company IS NOT NULL AND trim(company) != ''"
+    ).fetchall():
+        name = r["company"]
+        k = normalize_company(name)
+        if k and k not in companies:
+            companies[k] = {"company_key": k, "company_name": name}
+
+    # ── 2. Load all tracker_people ───────────────────────────────────────────
+    people_by_company: dict[str, list] = {}
+    for r in con.execute("""
+        SELECT person_key, company_key, company_name, name, title, email,
+               outreach_status, notes, needs_review, created_at, updated_at
+        FROM tracker_people
+        ORDER BY company_key, name
+    """).fetchall():
+        p = dict(r)
+        st = p.get("outreach_status", "not_contacted") or "not_contacted"
+        p["color"] = ("green" if st in ("contacted", "replied")
+                      else ("blue" if st == "followup_due" else "gray"))
+        k = p["company_key"]
+        people_by_company.setdefault(k, []).append(p)
+
+    # ── 3. Load all jobs ─────────────────────────────────────────────────────
+    jobs_by_company: dict[str, list] = {}
+    for r in con.execute("""
+        SELECT j.row_key, j.company, j.role_title, j.job_url, j.location,
+               j.match_score, j.jd_posted_date,
+               a.status AS app_status, a.status_changed_at
+        FROM jobs j
+        LEFT JOIN application_status a ON j.row_key = a.row_key
+    """).fetchall():
+        jd = dict(r)
+        jd["app_status"] = jd["app_status"] or "new"
+        k = normalize_company(jd["company"] or "")
+        if k:
+            jobs_by_company.setdefault(k, []).append(jd)
+
+    # ── 4. Build groups ──────────────────────────────────────────────────────
+    APPLIED_STAGES = {"applied", "phone_screen", "interview", "offer"}
+    CONTACTED_STATUSES = {"contacted", "followup_due", "replied"}
+    DEAD_STAGES = {"closed", "rejected"}
+
+    # Archiving only declutters the default browse view; any explicit narrowing
+    # (search / a filter / show-all) searches the full set instead.
+    explicit = bool(q or status or app_status or needs_contacts_only or show_all)
+    stale_cutoff = (_dt.datetime.now() - _dt.timedelta(days=7)).isoformat(timespec="seconds")
+
+    groups = []
+    archived_count = 0
+    for ck, cmeta in companies.items():
+        people = people_by_company.get(ck, [])
+        jobs = jobs_by_company.get(ck, [])
+
+        if not people and not jobs:
+            continue
+
+        # ── filters ──────────────────────────────────────────────────────────
+        # q: matches company name OR person name/title
+        if q:
+            ql = q.lower()
+            co_match = ql in (cmeta["company_name"] or "").lower()
+            person_match = any(
+                ql in (p.get("name", "") or "").lower() or
+                ql in (p.get("title", "") or "").lower()
+                for p in people
+            )
+            if not co_match and not person_match:
+                continue
+
+        # status: filter people
+        filtered_people = people
+        if status:
+            filtered_people = [p for p in people if p.get("outreach_status") == status]
+            if not filtered_people:
+                continue
+
+        # app_status: keep group if any job has this stage
+        if app_status:
+            if not any(j.get("app_status") == app_status for j in jobs):
+                continue
+
+        # ── counts ───────────────────────────────────────────────────────────
+        applied_count = sum(1 for j in jobs if j.get("app_status") in APPLIED_STAGES)
+        contacted_count = sum(
+            1 for p in filtered_people if p.get("outreach_status") in CONTACTED_STATUSES
+        )
+
+        # ── group_status rollup ───────────────────────────────────────────────
+        # offer > interview > applied > contacted > needs_contact > neutral
+        statuses = {j.get("app_status") for j in jobs}
+        person_statuses = {p.get("outreach_status") for p in filtered_people}
+
+        if "offer" in statuses:
+            group_status = "offer"
+        elif "interview" in statuses:
+            group_status = "interview"
+        elif "phone_screen" in statuses or applied_count > 0:
+            group_status = "applied"
+        elif contacted_count > 0:
+            group_status = "contacted"
+        elif jobs and not filtered_people:
+            group_status = "needs_contact"
+        else:
+            group_status = "neutral"
+
+        # needs_contacts_only is applied below, once lifecycle signals are known.
+
+        # ── sort keys (robust: fall back to job posted dates so EVERY company orders) ──
+        people_touch = [p.get("updated_at") or "" for p in filtered_people]
+        people_add   = [p.get("created_at") or "" for p in filtered_people]
+        job_changed  = [j.get("status_changed_at") or "" for j in jobs]
+        job_posted   = [(j.get("jd_posted_date") or "")[:19] for j in jobs]
+        added_key     = max([d for d in (people_add + job_posted) if d] or [""])
+        last_activity = max([d for d in (people_touch + job_changed + job_posted + people_add) if d] or [""])
+
+        # ── lifecycle signals ─────────────────────────────────────────────────
+        active_app = any(j.get("app_status") in APPLIED_STAGES for j in jobs)
+        tracked = [j.get("app_status") for j in jobs
+                   if j.get("app_status") and j.get("app_status") != "new"]
+        all_closed = bool(tracked) and all(s in DEAD_STAGES for s in tracked)
+        no_people = len(filtered_people) == 0
+
+        # needs_contacts_only: any company with jobs but no contacts yet (excl. dead)
+        if needs_contacts_only and not (jobs and no_people and not all_closed):
+            continue
+
+        # ── archive (hidden in default browse view): dead, or cold & stale ─────
+        is_archived = all_closed or (no_people and not active_app and last_activity < stale_cutoff)
+        if is_archived and not explicit:
+            archived_count += 1
+            continue
+
+        # ── max match_score (for "fit" sort) ──────────────────────────────────
+        scores = [j.get("match_score") or 0 for j in jobs]
+        max_score = max(scores) if scores else 0
+
+        groups.append({
+            "company_key": ck,
+            "company_name": cmeta["company_name"],
+            "people": filtered_people,
+            "jobs": jobs,
+            "people_count": len(filtered_people),
+            "jobs_count": len(jobs),
+            "applied_count": applied_count,
+            "contacted_count": contacted_count,
+            "group_status": group_status,
+            "last_activity": last_activity,
+            "added_key": added_key,
+            "max_score": max_score,
+            "is_archived": is_archived,
+            "is_placeholder": len(filtered_people) == 0,
+        })
+
+    # ── 5. Sort (sensible default direction per key) ───────────────────────────
+    if sort == "company":
+        groups.sort(key=lambda g: (g["company_name"] or "").lower(),
+                    reverse=(dir == "desc"))
+    elif sort == "added":
+        groups.sort(key=lambda g: g["added_key"], reverse=(dir != "asc"))
+    elif sort == "fit":
+        groups.sort(key=lambda g: g["max_score"], reverse=(dir != "asc"))
+    elif sort == "applied":
+        groups.sort(key=lambda g: g["applied_count"], reverse=(dir != "asc"))
+    else:  # activity (default)
+        groups.sort(key=lambda g: g["last_activity"], reverse=(dir != "asc"))
+
+    # ── 6. Stats (scoreboard) ─────────────────────────────────────────────────
+    # Use the full (unfiltered) universe for stats so the scoreboard reflects
+    # overall progress, not just what the current filter shows.
+    all_people_flat = [p for ps in people_by_company.values() for p in ps]
+    all_groups_full = list(companies.keys())
+    total_companies = len(all_groups_full)
+
+    companies_contacted = sum(
+        1 for ck in companies
+        if any(
+            p.get("outreach_status") in CONTACTED_STATUSES
+            for p in people_by_company.get(ck, [])
+        )
+    )
+    companies_applied = sum(
+        1 for ck in companies
+        if any(
+            j.get("app_status") in APPLIED_STAGES
+            for j in jobs_by_company.get(ck, [])
+        )
+    )
+    people_total = sum(len(ps) for ps in people_by_company.values())
+    added_this_week = sum(
+        1 for p in all_people_flat
+        if (p.get("created_at") or "") >= week_ago
+    )
+
+    stats = {
+        "total_companies": total_companies,
+        "companies_contacted": companies_contacted,
+        "companies_applied": companies_applied,
+        "people_total": people_total,
+        "added_this_week": added_this_week,
+        "archived_count": archived_count,
+    }
+
+    return groups, stats
+
+
+def set_tracker_person_status(con, person_key: str, status: str) -> None:
+    """Update outreach_status for a person."""
+    con.execute(
+        "UPDATE tracker_people SET outreach_status = ?, updated_at = ? WHERE person_key = ?",
+        (status, _now(), person_key)
+    )
+    con.commit()
+
+
+def set_tracker_person_notes(con, person_key: str, notes: str) -> None:
+    """Update notes for a tracker person."""
+    con.execute(
+        "UPDATE tracker_people SET notes = ?, updated_at = ? WHERE person_key = ?",
+        (notes, _now(), person_key)
+    )
+    con.commit()
+
+
+def get_contact_row(con, person_key: str) -> dict | None:
+    """Single tracker person row for HTMX swap after a status/notes update."""
+    r = con.execute("""
+        SELECT person_key, company_key, company_name, name, title, email,
+               outreach_status, notes, needs_review
+        FROM tracker_people WHERE person_key = ?
+    """, (person_key,)).fetchone()
+    if not r:
+        return None
+    person = dict(r)
+    person["is_placeholder"] = False
+    jobs_rows = con.execute("""
+        SELECT j.row_key, j.role_title, a.status AS app_status
+        FROM jobs j
+        LEFT JOIN application_status a ON j.row_key = a.row_key
+        WHERE lower(trim(j.company)) = ?
+    """, (person["company_key"],)).fetchall()
+    person["jobs"] = [
+        {"row_key": jr["row_key"], "role_title": jr["role_title"], "app_status": jr["app_status"] or "new"}
+        for jr in jobs_rows
+    ]
+    # Compute color
+    st = person.get("outreach_status", "not_contacted")
+    person["color"] = "green" if st in ("contacted", "replied") else ("blue" if st == "followup_due" else "gray")
+    return person
+
+
+def get_tracker_person(con, person_key: str) -> dict | None:
+    """Return a single tracker_people row with color computed."""
+    r = con.execute("""
+        SELECT person_key, company_key, company_name, name, title, email,
+               outreach_status, notes, needs_review, created_at, updated_at
+        FROM tracker_people WHERE person_key = ?
+    """, (person_key,)).fetchone()
+    if not r:
+        return None
+    p = dict(r)
+    st = p.get("outreach_status", "not_contacted") or "not_contacted"
+    p["color"] = ("green" if st in ("contacted", "replied")
+                  else ("blue" if st == "followup_due" else "gray"))
+    return p
+
+
+def get_tracker_job(con, row_key: str) -> dict | None:
+    """Return a single job row for the tracker (with app_status)."""
+    r = con.execute("""
+        SELECT j.row_key, j.company, j.role_title, j.job_url, j.location,
+               j.match_score, j.jd_posted_date,
+               a.status AS app_status, a.status_changed_at
+        FROM jobs j
+        LEFT JOIN application_status a ON j.row_key = a.row_key
+        WHERE j.row_key = ?
+    """, (row_key,)).fetchone()
+    if not r:
+        return None
+    jd = dict(r)
+    jd["app_status"] = jd["app_status"] or "new"
+    return jd
+
+
+def tracker_export_rows(con) -> list[dict]:
+    """Flatten tracker_people + jobs for CSV export."""
+    rows = con.execute("""
+        SELECT person_key, company_key, company_name, name, title, email,
+               outreach_status, notes
+        FROM tracker_people
+        ORDER BY company_key, name
+    """).fetchall()
+
+    jobs_by_company: dict[str, list] = {}
+    for job in con.execute("""
+        SELECT j.row_key, j.company, j.role_title, a.status AS app_status
+        FROM jobs j
+        LEFT JOIN application_status a ON j.row_key = a.row_key
+    """).fetchall():
+        ck = normalize_company(job["company"])
+        jobs_by_company.setdefault(ck, []).append({
+            "role_title": job["role_title"],
+            "app_status": job["app_status"] or "new",
+        })
+
+    result = []
+    for r in rows:
+        d = dict(r)
+        jobs = jobs_by_company.get(d["company_key"], [])
+        d["jobs_summary"] = "; ".join(
+            f"{j['role_title']} ({j['app_status']})" for j in jobs
+        )
+        result.append(d)
+    return result
+
+
+def company_suggestions(con, q: str) -> list[dict]:
+    """
+    Return fuzzy-ranked company suggestions for the type-ahead.
+    Union of tracker_people, companies, and manual_company.
+    """
+    # Collect all unique companies
+    companies_dict = {}
+    
+    # From tracker_people
+    for row in con.execute("""
+        SELECT DISTINCT company_key, company_name FROM tracker_people
+    """).fetchall():
+        key = row["company_key"]
+        if key not in companies_dict:
+            companies_dict[key] = {
+                "company_key": key,
+                "company_name": row["company_name"]
+            }
+    
+    # From companies
+    for row in con.execute("""
+        SELECT company_key, company_name FROM companies
+    """).fetchall():
+        key = row["company_key"]
+        if key not in companies_dict:
+            companies_dict[key] = {
+                "company_key": key,
+                "company_name": row["company_name"]
+            }
+    
+    # From manual_company
+    for row in con.execute("""
+        SELECT company_key, company_name FROM manual_company
+    """).fetchall():
+        key = row["company_key"]
+        if key not in companies_dict:
+            companies_dict[key] = {
+                "company_key": key,
+                "company_name": row["company_name"]
+            }
+
+    # From jobs — postings whose company has no company record yet. These are
+    # exactly the "needs contacts" placeholder rows, so they must be selectable
+    # in the Add-people drawer and the company filter.
+    for row in con.execute("""
+        SELECT DISTINCT company FROM jobs
+        WHERE company IS NOT NULL AND trim(company) != ''
+    """).fetchall():
+        name = row["company"]
+        key = normalize_company(name)
+        if key and key not in companies_dict:
+            companies_dict[key] = {
+                "company_key": key,
+                "company_name": name
+            }
+
+    # Rank by fuzzy match against q
+    candidates = list(companies_dict.values())
+    if not q:
+        return candidates
+    
+    q_core = company_core(q)
+    scored = []
+    for cand in candidates:
+        cand_core = company_core(cand["company_name"])
+        ratio = difflib.SequenceMatcher(None, q_core, cand_core).ratio() if q_core and cand_core else 0
+        scored.append((ratio, cand))
+    
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [cand for _, cand in scored]
+
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
@@ -77,11 +727,22 @@ def _shape(r) -> dict:
         d["job_day"] = first_seen[:10]
     else:
         d["job_day"] = ""
+    d["posted_at"] = freshness.posted_at_of(d)
     return d
 
 
+def _sort_board(jobs: list[dict]) -> list[dict]:
+    """Default board order: freshest first, then Fit, then starred."""
+    jobs.sort(key=lambda d: (d.get("posted_at") or "",
+                             d.get("match_score") or 0,
+                             1 if d.get("starred") else 0), reverse=True)
+    return jobs
+
+
 def get_jobs(con, q=None, sector=None, min_score=0, status=None,
-             show_dismissed=False, starred_only=False, view=None, day=None) -> list[dict]:
+             show_dismissed=False, starred_only=False, view=None, day=None,
+             fresh=None) -> list[dict]:
+    _now = datetime.datetime.now(datetime.timezone.utc)
     rows = [_shape(r) for r in con.execute(JOB_SELECT).fetchall()]
     out = []
     for d in rows:
@@ -117,6 +778,8 @@ def get_jobs(con, q=None, sector=None, min_score=0, status=None,
             continue
         if min_score and (d["match_score"] or 0) < int(min_score):
             continue
+        if fresh and not freshness.fresh_ok(d.get("posted_at") or "", _now, fresh):
+            continue
         if sector and d.get("sector") != sector:
             continue
         if status and d["status"] != status:
@@ -126,7 +789,7 @@ def get_jobs(con, q=None, sector=None, min_score=0, status=None,
             if q.lower() not in hay:
                 continue
         out.append(d)
-    out.sort(key=lambda d: (d["match_score"] or 0, d["starred"]), reverse=True)
+    _sort_board(out)
     return out
 
 
@@ -371,48 +1034,6 @@ def _person_row(p, ps, drafts, outr, is_manual: bool = False) -> dict:
     }
 
 
-def people(con) -> list[dict]:
-    comp = {r["company_key"]: dict(r) for r in con.execute("SELECT * FROM companies")}
-    # Overlay manual_company for companies not in Zone-1
-    for r in con.execute("SELECT * FROM manual_company"):
-        ck = r["company_key"]
-        comp.setdefault(ck, {"company_key": ck, "company_name": r["company_name"], "domain": r["domain"] or ""})
-    drafts = [dict(r) for r in con.execute("SELECT * FROM drafts")]
-    outr = [dict(r) for r in con.execute("SELECT * FROM outreach_log")]
-    ps_map = {r["person_key"]: dict(r) for r in con.execute("SELECT * FROM person_state")}
-    groups = {}
-    for p in con.execute("SELECT * FROM people"):
-        ck = p["company_key"]
-        g = groups.setdefault(ck, {
-            "company":     (comp.get(ck, {}).get("company_name") or ck),
-            "company_key": ck,
-            "domain":      comp.get(ck, {}).get("domain", ""),
-            "people":      [],
-        })
-        g["people"].append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr))
-    # Append manual people whose key is not already present
-    seen_keys = {pp["person_key"] for g in groups.values() for pp in g["people"]}
-    for p in con.execute("SELECT * FROM manual_people"):
-        pk = p["person_key"]
-        if pk in seen_keys:
-            continue
-        ck = p["company_key"]
-        comp_info = comp.get(ck, {})
-        g = groups.setdefault(ck, {
-            "company":     (comp_info.get("company_name") or ck),
-            "company_key": ck,
-            "domain":      comp_info.get("domain", ""),
-            "people":      [],
-        })
-        g["people"].append(_person_row(p, ps_map.get(pk), drafts, outr, is_manual=True))
-    out = sorted(groups.values(), key=lambda g: (-len(g["people"]), g["company"].lower()))
-    for g in out:
-        g["count"] = len(g["people"])
-        g["emails"] = sum(1 for pp in g["people"] if pp["has_email"])
-        g["contacted"] = sum(1 for pp in g["people"] if pp["outreach_status"] in ("contacted", "followup_due", "replied"))
-    return out
-
-
 def company_detail(con, company_key: str) -> dict:
     comp_row = con.execute("SELECT * FROM companies WHERE company_key=?", (company_key,)).fetchone()
     if comp_row:
@@ -488,92 +1109,6 @@ def set_person_status(con, person_key: str, status: str) -> None:
             (status, now, person_key),
         )
     con.commit()
-
-
-def tracker_rows(con) -> list[dict]:
-    """All scored jobs with application state + contact count, sorted by match_score desc."""
-    # Build contact count by normalize_company(company_key) -> count (Zone-1 + manual)
-    contact_counts: dict[str, int] = {}
-    for r in con.execute(
-        "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
-    ).fetchall():
-        contact_counts[normalize_company(r["company_key"])] = r["cnt"]
-    for r in con.execute(
-        "SELECT company_key, COUNT(*) AS cnt FROM manual_people GROUP BY company_key"
-    ).fetchall():
-        nk = normalize_company(r["company_key"])
-        contact_counts[nk] = contact_counts.get(nk, 0) + r["cnt"]
-
-    rows = []
-    for r in con.execute(
-        "SELECT j.row_key, j.company, j.role_title, j.job_url, j.match_score, j.sector, "
-        "       s.applied_at, s.notes, a.status AS app_status "
-        "FROM jobs j "
-        "LEFT JOIN app_state s ON j.row_key = s.row_key "
-        "LEFT JOIN application_status a ON j.row_key = a.row_key "
-        "WHERE j.match_score IS NOT NULL "
-        "ORDER BY j.match_score DESC"
-    ).fetchall():
-        d = dict(r)
-        score = d.get("match_score") or 0
-        applied = bool(d.get("applied_at"))
-        applied_at_raw = d.get("applied_at") or ""
-        d["score_tone"] = "high" if score >= 75 else ("mid" if score >= 55 else "low")
-        d["applied"] = applied
-        d["applied_at"] = applied_at_raw[:10] if applied_at_raw else ""
-        d["notes"] = d.get("notes") or ""
-        d["status"] = d.get("app_status") or ("applied" if applied else "new")
-        d["contacts"] = contact_counts.get(normalize_company(d.get("company") or ""), 0)
-        rows.append(d)
-    return rows
-
-
-def get_tracker_row(con, row_key: str) -> dict | None:
-    """Single tracker row for HTMX swap after a status update."""
-    contact_counts: dict[str, int] = {}
-    for r in con.execute(
-        "SELECT company_key, COUNT(*) AS cnt FROM people GROUP BY company_key"
-    ).fetchall():
-        contact_counts[normalize_company(r["company_key"])] = r["cnt"]
-    for r in con.execute(
-        "SELECT company_key, COUNT(*) AS cnt FROM manual_people GROUP BY company_key"
-    ).fetchall():
-        nk = normalize_company(r["company_key"])
-        contact_counts[nk] = contact_counts.get(nk, 0) + r["cnt"]
-
-    r = con.execute(
-        "SELECT j.row_key, j.company, j.role_title, j.job_url, j.match_score, j.sector, "
-        "       s.applied_at, s.notes, a.status AS app_status "
-        "FROM jobs j "
-        "LEFT JOIN app_state s ON j.row_key = s.row_key "
-        "LEFT JOIN application_status a ON j.row_key = a.row_key "
-        "WHERE j.row_key = ?",
-        (row_key,),
-    ).fetchone()
-    if not r:
-        return None
-    d = dict(r)
-    score = d.get("match_score") or 0
-    applied = bool(d.get("applied_at"))
-    applied_at_raw = d.get("applied_at") or ""
-    d["score_tone"] = "high" if score >= 75 else ("mid" if score >= 55 else "low")
-    d["applied"] = applied
-    d["applied_at"] = applied_at_raw[:10] if applied_at_raw else ""
-    d["notes"] = d.get("notes") or ""
-    d["status"] = d.get("app_status") or ("applied" if applied else "new")
-    d["contacts"] = contact_counts.get(normalize_company(d.get("company") or ""), 0)
-    return d
-
-
-def tracker_summary(con) -> dict:
-    g = lambda s, *a: con.execute(s, a).fetchone()[0]
-    total = g("SELECT COUNT(*) FROM jobs WHERE match_score IS NOT NULL")
-    applied = g("SELECT COUNT(*) FROM app_state WHERE applied_at IS NOT NULL")
-    interviewing = g(
-        "SELECT COUNT(*) FROM application_status WHERE status IN ('phone_screen','interview')"
-    )
-    offers = g("SELECT COUNT(*) FROM application_status WHERE status = 'offer'")
-    return {"total": total, "applied": applied, "interviewing": interviewing, "offers": offers}
 
 
 def add_manual_company(con, company_name: str, domain: str = "") -> str:

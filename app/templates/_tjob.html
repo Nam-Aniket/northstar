@@ -1,0 +1,59 @@
+{# ── _tjob.html — single job sub-row inside a company group ──────────────── #}
+{# Called with j = job dict, status_flow in context                             #}
+{% set ast = j.app_status or 'new' %}
+<div class="tjob" id="tjob-{{ j.row_key|domid }}">
+
+  {# role title link #}
+  <div class="tjob__role">
+    {% if j.job_url %}
+      <a href="{{ j.job_url }}" target="_blank" rel="noopener"
+         onclick="event.stopPropagation()" title="{{ j.role_title or '' }}">{{ j.role_title or '—' }}</a>
+    {% else %}
+      <a href="/jobs/{{ j.row_key|urlk }}"
+         onclick="event.stopPropagation()" title="{{ j.role_title or '' }}">{{ j.role_title or '—' }}</a>
+    {% endif %}
+  </div>
+
+  {# Fit % chip #}
+  <div>
+    {% if j.match_score is not none and j.match_score != '' %}
+      {% set score = j.match_score|int %}
+      {% set tone = 'high' if score >= 75 else ('mid' if score >= 55 else 'low') %}
+      <span class="chip fitpill {{ tone }}">{{ score }}%</span>
+    {% else %}
+      <span class="chip" style="color:rgb(var(--c-muted))">—</span>
+    {% endif %}
+  </div>
+
+  {# location #}
+  <div class="tjob__location">
+    <span>{{ j.location or '—' }}</span>
+  </div>
+
+  {# application status pill-select (coloured by value) #}
+  <div>
+    <label class="sr-only" for="js-{{ j.row_key|domid }}">Application status</label>
+    <select id="js-{{ j.row_key|domid }}"
+            name="status"
+            class="tjpill tjpill--{{ ast }}"
+            hx-post="/tracker/job/{{ j.row_key|urlk }}/status"
+            hx-target="#tjob-{{ j.row_key|domid }}"
+            hx-swap="outerHTML"
+            hx-trigger="change"
+            onclick="event.stopPropagation()">
+      {% for s in status_flow %}
+      <option value="{{ s }}" {{ 'selected' if ast == s }}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# applied / posted date — relative, exact on hover #}
+  <div class="tjob__dates">
+    {% if j.status_changed_at and ast not in ('new', '') %}
+      <span class="tip">{{ j.status_changed_at|reldate }}<span class="tip__bubble">{{ ast|replace('_',' ')|title }} {{ j.status_changed_at[:19] }}</span></span>
+    {% elif j.jd_posted_date %}
+      <span class="tip">posted {{ j.jd_posted_date|reldate }}<span class="tip__bubble">Posted {{ j.jd_posted_date }}</span></span>
+    {% endif %}
+  </div>
+
+</div>{# /.tjob #}

@@ -65,7 +65,9 @@ def parse_cards(html_text: str, keyword: str) -> list[dict]:
         if not m:
             continue
         jid = m.group(1)
-        date_m = re.search(r'datetime="([0-9]{4}-[0-9]{2}-[0-9]{2})"', chunk)
+        # Capture a time component when LinkedIn provides one (finer freshness);
+        # date-only postings still match and behave exactly as before.
+        date_m = re.search(r'datetime="([0-9]{4}-[0-9]{2}-[0-9]{2}(?:[T ][0-9:]{5,8})?)"', chunk)
         cards.append({
             "company": _grab(r'base-search-card__subtitle"[^>]*>(.*?)</h4', chunk),
             "role_title": _grab(r'base-search-card__title"[^>]*>(.*?)</h3', chunk),
@@ -75,7 +77,7 @@ def parse_cards(html_text: str, keyword: str) -> list[dict]:
             "required_skills": "",
             "preferred_skills": "",
             "notes": "",
-            "posted_date": date_m.group(1) if date_m else "",
+            "posted_date": (date_m.group(1).replace(" ", "T") if date_m else ""),
             "search_keyword": keyword,
             "source": "linkedin_guest_search",
         })
@@ -109,7 +111,7 @@ def main():
     ap.add_argument("--location", nargs="+", default=["Australia"],
                     help='One or more location strings (default ["Australia"] — scoring filters relevance).')
     ap.add_argument("--tpr", default="r86400",
-                    help="Recency: r86400=24h, r172800=48h, r604800=7d.")
+                    help="Recency seconds: r900=15m r3600=1h r14400=4h r86400=24h r172800=48h r604800=7d.")
     ap.add_argument("--out", default="job_alerts_raw.csv")
     ap.add_argument("--max-start", type=int, default=250,
                     help="Max pagination offset per keyword (250 = ~26 pages).")
@@ -120,7 +122,12 @@ def main():
                     help="Overwrite --out instead of merging into existing rows.")
     args = ap.parse_args()
 
-    crawler = SuperpoweredCrawlerFinal(respect_robots=False, polite_delay=args.delay, rps=0.6)
+    # Search result pages are recency-windowed (f_TPR) and the URL is byte-identical
+    # run-to-run — caching them replays stale jobs and hides genuinely new roles.
+    # Always fetch the search endpoint live. (Belt-and-suspenders: fetch() also
+    # refuses to cache this endpoint regardless of this flag.)
+    crawler = SuperpoweredCrawlerFinal(respect_robots=False, polite_delay=args.delay, rps=0.6,
+                                       cache_enabled=False)
 
     all_cards = []
     for loc in args.location:
@@ -145,7 +152,16 @@ def main():
         rows = csv_merge.merge_csv_on_key(existing, new_rows, csv_merge.row_key)
         print(f"[append] merged into {out} ({before} existing -> {len(rows)} total)")
     else:
+        before = 0
         rows = new_rows
+
+    # Machine-readable delta so the orchestrator can detect (and loudly surface)
+    # a run that scraped jobs but added nothing new — never a silent SUCCESS again.
+    appended = len(rows) - before
+    print(f"[discover-delta] scraped_unique={len(new_rows)} existing={before} appended={appended}")
+    if new_rows and appended == 0:
+        print("[discover-warning] 0 NEW jobs added: every scraped job was already known. "
+              "The search returned nothing new this run (no fresh postings in the recency window).")
 
     fieldnames = list(dict.fromkeys(OUT_COLUMNS + [k for r in rows for k in r.keys()]))
     with out.open("w", newline="", encoding="utf-8") as f:

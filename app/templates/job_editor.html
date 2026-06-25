@@ -28,6 +28,7 @@
     <div class="panel p-5">
       <h2 class="section-h mb-3">Match fit</h2>
       {% include "_job_fit.html" %}
+      <div id="bullet-suggestions" class="mt-4"></div>
     </div>
 
     <div class="panel p-5 flex flex-col gap-5">
@@ -105,8 +106,9 @@
     <div class="panel overflow-hidden">
       {# Toolbar #}
       <div class="flex items-center justify-between gap-3 px-5 py-3 border-b flex-wrap" style="border-color:rgb(var(--c-line))">
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-semibold uppercase tracking-wider" style="color:rgb(var(--c-muted))">Resume preview</span>
+        <div class="flex items-center gap-2">
+          <button type="button" id="tab-resume" class="prev-tab is-active">Resume</button>
+          <button type="button" id="tab-cover" class="prev-tab">Cover letter</button>
           <span id="page-count-badge" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;line-height:1.6"></span>
         </div>
         <button type="button" id="download-btn" class="btn-apply">
@@ -135,6 +137,10 @@
                    box-shadow:0 2px 20px rgba(0,0,0,.18)">
             <p style="color:#999;font-size:12px;text-align:center;margin-top:40px">Loading your tailored draft...</p>
           </div>
+          <div id="cover-paper"
+            style="display:none;position:relative;background:#fff;color:#111;font-family:Calibri,Arial,sans-serif;font-size:11pt;
+                   line-height:1.5;padding:76px;width:794px;min-height:1122px;box-sizing:border-box;
+                   box-shadow:0 2px 20px rgba(0,0,0,.18)"></div>
         </div>
       </div>
     </div>
@@ -164,17 +170,37 @@
     return d;
   }
 
+  function bulletRow(text) {
+    var row = document.createElement('div');
+    row.className = 'bullet-row';
+    row.innerHTML =
+      '<textarea class="filter-select bullet-text" rows="2"></textarea>' +
+      '<button type="button" class="bullet-del" title="Delete this bullet">' +
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+      '</button>';
+    row.querySelector('.bullet-text').value = text || '';
+    row.querySelector('.bullet-del').addEventListener('click', function () { row.remove(); scheduleRender(); });
+    return row;
+  }
+
   function expBlock() {
-    return rowShell('exp-block', 'remove-exp', [
+    var block = rowShell('exp-block', 'remove-exp', [
       '<div class="grid grid-cols-2 gap-3">',
         '<div class="col-span-2"><label class="filter-label">Role / heading</label>',
           '<input class="filter-select exp-role" type="text" style="padding-right:36px"></div>',
         '<div><label class="filter-label">Company</label><input class="filter-select exp-company" type="text"></div>',
         '<div><label class="filter-label">Dates</label><input class="filter-select exp-dates" type="text"></div>',
-        '<div class="col-span-2"><label class="filter-label">Bullet points (one per line)</label>',
-          '<textarea class="filter-select exp-bullets" rows="4"></textarea></div>',
+        '<div class="col-span-2"><label class="filter-label">Bullet points</label>',
+          '<div class="bullet-list"></div>',
+          '<button type="button" class="add-bullet">+ Add bullet</button>',
+        '</div>',
       '</div>',
     ].join(''));
+    block.querySelector('.add-bullet').addEventListener('click', function () {
+      block.querySelector('.bullet-list').appendChild(bulletRow(''));
+      scheduleRender();
+    });
+    return block;
   }
 
   function projBlock() {
@@ -207,11 +233,15 @@
   function collect() {
     var exps = [];
     document.querySelectorAll('.exp-block').forEach(function (b) {
+      var bullets = [];
+      b.querySelectorAll('.bullet-text').forEach(function (t) {
+        var v = t.value.trim(); if (v) bullets.push(v);
+      });
       exps.push({
         role: b.querySelector('.exp-role').value.trim(),
         company: b.querySelector('.exp-company').value.trim(),
         dates: b.querySelector('.exp-dates').value.trim(),
-        bullets: lines(b.querySelector('.exp-bullets').value),
+        bullets: bullets,
       });
     });
     var projs = [];
@@ -305,6 +335,7 @@
     document.getElementById('preview-paper').innerHTML = html.join('');
     layoutPaper();
     updateCoverage(d);
+    renderCover();
   }
 
   /* ── Live keyword coverage ──────────────────────────────────────────────────── */
@@ -406,7 +437,9 @@
       if (e.role) b.querySelector('.exp-role').value = e.role;
       if (e.company) b.querySelector('.exp-company').value = e.company;
       if (e.dates) b.querySelector('.exp-dates').value = e.dates;
-      if (e.bullets && e.bullets.length) b.querySelector('.exp-bullets').value = e.bullets.join('\n');
+      if (e.slot) b.dataset.slot = e.slot;
+      var bl = b.querySelector('.bullet-list');
+      (e.bullets || []).forEach(function (txt) { bl.appendChild(bulletRow(txt)); });
     });
 
     var projList = document.getElementById('proj-list'); projList.innerHTML = '';
@@ -454,6 +487,100 @@
       f.value = cur ? cur + ', ' + skill : skill;
       scheduleRender();
     }
+  });
+
+  /* ── Cover-letter preview + tab switching (Part D) ────────────────────────── */
+  function renderCover() {
+    var paper = document.getElementById('cover-paper');
+    if (!paper) return;
+    var raw = val('f-cover');
+    var d = collect();
+    var head = [];
+    if (d.name) head.push('<div style="font-size:14pt;font-weight:700;color:#1F4E79">' + esc(d.name) + '</div>');
+    var contact = [d.email, d.phone, d.location].filter(Boolean).map(esc).join('  ·  ');
+    if (contact) head.push('<div style="font-size:9.5pt;color:#57534A;margin-bottom:18px">' + contact + '</div>');
+    var paras = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+    var body = paras.map(function (p) {
+      return '<p style="margin:0 0 11px;font-size:11pt">' + esc(p).replace(/\n/g, '<br>') + '</p>';
+    }).join('');
+    paper.innerHTML = head.join('') + (body || '<p style="color:#999;text-align:center;margin-top:40px">Your cover letter preview appears here.</p>');
+  }
+
+  function showTab(which) {
+    var isCover = which === 'cover';
+    document.getElementById('preview-paper').style.display = isCover ? 'none' : 'block';
+    document.getElementById('cover-paper').style.display = isCover ? 'block' : 'none';
+    document.getElementById('tab-resume').classList.toggle('is-active', !isCover);
+    document.getElementById('tab-cover').classList.toggle('is-active', isCover);
+    if (isCover) renderCover(); else layoutPaper();
+  }
+  document.getElementById('tab-resume').addEventListener('click', function () { showTab('resume'); });
+  document.getElementById('tab-cover').addEventListener('click', function () { showTab('cover'); });
+
+  /* ── Find the experience block for a slot (exact), else by role text ──────── */
+  function findExpBlock(slot, roleHeader) {
+    var blocks = document.querySelectorAll('.exp-block');
+    var i;
+    if (slot) {
+      for (i = 0; i < blocks.length; i++) {
+        if (blocks[i].dataset.slot === slot) return blocks[i];
+      }
+    }
+    if (roleHeader) {
+      var head = roleHeader.toLowerCase();
+      for (i = 0; i < blocks.length; i++) {
+        var r = (blocks[i].querySelector('.exp-role') || {}).value || '';
+        if (r && head.indexOf(r.trim().toLowerCase()) !== -1) return blocks[i];
+      }
+    }
+    return blocks.length ? blocks[0] : null;
+  }
+
+  function insertBulletInto(block, text) {
+    if (!block) return;
+    var bl = block.querySelector('.bullet-list');
+    var dup = Array.prototype.some.call(bl.querySelectorAll('.bullet-text'),
+      function (t) { return t.value.trim() === text.trim(); });
+    if (!dup) { bl.appendChild(bulletRow(text)); scheduleRender(); }
+  }
+
+  /* ── Add a fact-bank evidence bullet into its role (Part A) ────────────────── */
+  document.body.addEventListener('click', function (e) {
+    if (!e.target.closest('.suggest-add')) return;
+    var card = e.target.closest('.suggest-card');
+    if (!card) return;
+    insertBulletInto(findExpBlock(card.getAttribute('data-target-slot'),
+                                  card.querySelector('.suggest-role').textContent),
+                     card.getAttribute('data-add-bullet'));
+    card.classList.add('is-added');
+    var btn = card.querySelector('.suggest-add');
+    btn.textContent = 'Added'; btn.disabled = true;
+  });
+
+  /* ── Write-once: save a new bullet to the fact bank + place it (Part B) ────── */
+  document.body.addEventListener('click', function (e) {
+    if (!e.target.closest('.wo-save')) return;
+    var form = e.target.closest('.writeonce');
+    var text = form.querySelector('.wo-text').value.trim();
+    var slot = form.querySelector('.wo-slot').value;
+    var skill = form.getAttribute('data-skill');
+    var row = form.getAttribute('data-row');
+    if (!text) { form.querySelector('.wo-text').focus(); return; }
+    var btn = e.target.closest('.wo-save'); btn.disabled = true; btn.textContent = 'Saving...';
+    var body = new URLSearchParams({skill: skill, slot: slot, text: text});
+    fetch('/jobs/' + encodeURIComponent(row) + '/bullets/add',
+          {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'failed'); }); })
+      .then(function (d) {
+        insertBulletInto(findExpBlock(d.slot, d.role_header), d.text);
+        form.parentNode.innerHTML = '<p class="text-xs text-leaf">Added to ' + esc(d.role_header) + ' and saved to your fact bank.</p>';
+      })
+      .catch(function (err) {
+        btn.disabled = false; btn.textContent = 'Save & add';
+        var msg = document.createElement('p'); msg.className = 'text-xs'; msg.style.color = 'rgb(185 28 28)';
+        msg.textContent = 'Could not save: ' + err.message;
+        form.appendChild(msg);
+      });
   });
 
   /* ── Init ───────────────────────────────────────────────────────────────────── */

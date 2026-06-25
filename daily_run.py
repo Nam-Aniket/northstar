@@ -76,7 +76,7 @@ def _discover_args() -> list[str]:
     return a
 
 
-def _run_stage(name: str) -> tuple[bool, str]:
+def _run_stage(name: str) -> tuple[bool, str, str]:
     extra = _discover_args() if name == "discover" else _STAGE_ARGS.get(name, [])
     start = datetime.datetime.now()
     _log(f"\n----- stage {name} START {start.isoformat(timespec='seconds')} -----")
@@ -94,7 +94,7 @@ def _run_stage(name: str) -> tuple[bool, str]:
     _log(f"----- stage {name} END rc={r.returncode} dur={dur:.1f}s -----")
     ok = r.returncode == 0
     err = (r.stderr or "")[-500:]  # short tail still feeds the status UI
-    return ok, err
+    return ok, err, (r.stdout or "")
 
 
 def main() -> None:
@@ -160,13 +160,16 @@ def main() -> None:
             error_detail=None,
         )
 
+        no_new_jobs = False
         for name in order:
             run_status.write(
                 stage=name,
                 pct=run_status.PCT.get(name, 0),
                 message=_STAGE_MSG.get(name, f"Running {name}"),
             )
-            ok, err = _run_stage(name)
+            ok, err, out = _run_stage(name)
+            if name == "discover" and "[discover-warning]" in (out or ""):
+                no_new_jobs = True
             if not ok and name not in _NON_FATAL:
                 _log(f"=== FAILED at {name} (full stage output above) ===")
                 run_status.write(
@@ -224,8 +227,21 @@ def main() -> None:
                 ["Upload your resume in onboarding so tailored resumes can be built",
                  "from your real experience, then run again."],
             )
-        done_msg = "Up to date (no resumes - see log)" if no_resume_reason else "Up to date"
+        if no_resume_reason:
+            done_msg = "Up to date (no resumes - see log)"
+        elif no_new_jobs:
+            done_msg = "Up to date (no new jobs found)"
+        else:
+            done_msg = "Up to date"
         run_status.write(stage="done", pct=100, message=done_msg, ok=True, finished_at=_now())
+        if no_new_jobs:
+            _log("")
+            _log("!" * 60)
+            _log("[!] NO NEW JOBS - discovery added 0 new roles this run.")
+            _log("    Every job the search returned was already on your board. This is")
+            _log("    normal when nothing fresh was posted in your recency window; it is")
+            _log("    NOT a cache problem (live search caching is disabled).")
+            _log("!" * 60)
         if no_resume_reason:
             why, how = no_resume_reason
             _log("")
@@ -235,7 +251,11 @@ def main() -> None:
             for line in how:
                 _log("    " + line)
             _log("!" * 60)
-        tail = " | NO resumes (see above)" if no_resume_reason else ""
+        tail = ""
+        if no_new_jobs:
+            tail += " | 0 NEW jobs (see above)"
+        if no_resume_reason:
+            tail += " | NO resumes (see above)"
         _log(f"=== SUCCESS : {total} postings synced, {scored} scored onto the board{tail} ===")
 
     finally:

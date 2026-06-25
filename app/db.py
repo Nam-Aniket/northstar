@@ -133,5 +133,77 @@ def init_schema(con: sqlite3.Connection) -> None:
             domain       TEXT,
             created_at   TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS tracker_people (
+            person_key      TEXT PRIMARY KEY,
+            company_key     TEXT NOT NULL,
+            company_name    TEXT,
+            name            TEXT,
+            title           TEXT,
+            email           TEXT,
+            pattern         TEXT,
+            outreach_status TEXT DEFAULT 'not_contacted',
+            notes           TEXT DEFAULT '',
+            needs_review    INT  DEFAULT 0,
+            created_at      TEXT,
+            updated_at      TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_tracker_people_company ON tracker_people(company_key);
     """)
     con.commit()
+
+
+def migrate_tracker_people(con: sqlite3.Connection) -> int:
+    """
+    Idempotent one-shot migration: if tracker_people is empty and manual_people has rows,
+    copy each manual_people row + its person_state status/notes + manual_company display name
+    into tracker_people. Preserves person_key stability.
+    
+    Returns count of rows migrated.
+    """
+    # Check if tracker_people already has data
+    count = con.execute("SELECT COUNT(*) FROM tracker_people").fetchone()[0]
+    if count > 0:
+        return 0  # Already migrated
+    
+    # Get all manual_people and join with person_state and manual_company
+    rows = con.execute("""
+        SELECT
+            mp.person_key,
+            mp.company_key,
+            COALESCE(mc.company_name, mp.company_key) AS company_name,
+            mp.name,
+            mp.role,
+            mp.verified_email,
+            ps.outreach_status,
+            ps.notes,
+            ps.updated_at,
+            mp.created_at
+        FROM manual_people mp
+        LEFT JOIN person_state ps ON mp.person_key = ps.person_key
+        LEFT JOIN manual_company mc ON mp.company_key = mc.company_key
+    """).fetchall()
+    
+    migrated = 0
+    for row in rows:
+        con.execute("""
+            INSERT OR IGNORE INTO tracker_people
+            (person_key, company_key, company_name, name, title, email,
+             outreach_status, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            row['person_key'],
+            row['company_key'],
+            row['company_name'],
+            row['name'],
+            row['role'],
+            row['verified_email'],
+            row['outreach_status'] or 'not_contacted',
+            row['notes'] or '',
+            row['created_at'],
+            row['updated_at']
+        ))
+        migrated += 1
+    
+    con.commit()
+    return migrated

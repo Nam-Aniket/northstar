@@ -1,0 +1,10 @@
+{% if rows %}
+  {% for row in rows %}{% include "_contact_row.html" %}{% endfor %}
+{% else %}
+<tr>
+  <td colspan="7" style="text-align:center;padding:48px 12px;color:rgb(var(--c-muted))">
+    <p style="font-size:1.1rem;font-weight:700;margin-bottom:6px">No people yet</p>
+    <p style="font-size:13px">Paste a LinkedIn People tab to add contacts.</p>
+  </td>
+</tr>
+{% endif %}
