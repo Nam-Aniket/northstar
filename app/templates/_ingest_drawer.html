@@ -1,0 +1,58 @@
+{# ── Slide-over drawer — no-JS-build CSS toggle via hidden checkbox ──────────── #}
+<input type="checkbox" id="drawer-toggle" class="drawer-checkbox" aria-hidden="true">
+<div class="drawer-overlay" onclick="document.getElementById('drawer-toggle').checked=false"></div>
+<aside class="ingest-drawer" role="dialog" aria-modal="true" aria-label="Add people">
+  <div class="ingest-drawer__header">
+    <h2 style="font-size:1rem;font-weight:700;color:rgb(var(--c-ink))">Add people</h2>
+    <label for="drawer-toggle" class="iconlink" style="cursor:pointer" title="Close">
+      <svg viewBox="0 0 24 24" class="w-[16px] h-[16px]" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </label>
+  </div>
+
+  <form hx-post="/tracker/ingest"
+        hx-target="#contacts-table"
+        hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful){document.getElementById('drawer-toggle').checked=false}"
+        style="display:flex;flex-direction:column;gap:14px;padding:0 20px 24px">
+
+    <div>
+      <label class="filter-label" for="ingest-paste">LinkedIn People tab paste</label>
+      <textarea id="ingest-paste" name="paste" rows="10"
+                placeholder="Paste the raw text from the LinkedIn 'People' tab here…"
+                style="width:100%;font-size:12.5px;padding:10px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink));resize:vertical;font-family:inherit"
+                required></textarea>
+    </div>
+
+    <div>
+      <label class="filter-label" for="ingest-company">Company name</label>
+      {# Free-text input named 'company' for the POST. The datalist offers every
+         known company as native autocomplete; typing a brand-new name is allowed
+         and is fuzzy-resolved server-side by resolve_company(). #}
+      <input id="ingest-company" name="company" type="text"
+             placeholder="e.g. Acme Corp"
+             list="company-suggestions" autocomplete="off"
+             style="width:100%;font-size:13px;padding:9px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink))"
+             required>
+      <datalist id="company-suggestions">
+        {% for c in all_companies %}
+        <option value="{{ c.company_name }}">
+        {% endfor %}
+      </datalist>
+    </div>
+
+    <div>
+      <label class="filter-label" for="ingest-pattern">Email pattern</label>
+      <input id="ingest-pattern" name="pattern" type="text"
+             placeholder="{first}.{last}@company.com"
+             style="width:100%;font-size:13px;padding:9px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink))"
+             required>
+      <p style="font-size:11px;color:rgb(var(--c-muted));margin-top:4px">
+        Tokens: <code>{first}</code> <code>{last}</code> <code>{f}</code> <code>{l}</code>
+      </p>
+    </div>
+
+    <button type="submit" class="btn" style="align-self:flex-start">
+      Parse &amp; import
+    </button>
+  </form>
+</aside>

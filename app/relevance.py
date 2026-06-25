@@ -9,6 +9,24 @@ import re
 
 MID_RANK = 2
 
+
+class _Desc:
+    """Wrap a value so ascending sort yields descending order of the original.
+
+    Lets a single sort key mix ascending fields (over_level) with a descending
+    string field (posted_at, an ISO timestamp that can't be numerically negated).
+    """
+    __slots__ = ("v",)
+
+    def __init__(self, v):
+        self.v = v or ""
+
+    def __lt__(self, other):
+        return self.v > other.v
+
+    def __eq__(self, other):
+        return self.v == other.v
+
 # Checked most-senior first so a multi-word title resolves to its highest level.
 # Each entry: (label, rank, [trigger phrases]). Phrases are matched on word
 # boundaries against the lowercased title.
@@ -101,11 +119,13 @@ def classify_job(job: dict, profile: dict, cap: int) -> dict:
 def apply_for_me_view(jobs: list[dict], profile: dict, override_rank: int | None = None) -> list[dict]:
     """Hide off-target jobs, sink over-level jobs, sort for the For-me board.
 
-    Sort key: in-level before over-level, then match_score descending.
-    `override_rank` (None = auto) replaces the profile's seniority cap.
+    Sort key: in-level before over-level, then freshest (posted_at) first, then
+    match_score descending. `override_rank` (None = auto) replaces the cap.
     """
     cap = override_rank if override_rank is not None else profile.get("max_seniority_rank", MID_RANK)
     classified = [classify_job(j, profile, cap) for j in jobs]
     kept = [j for j in classified if j["on_target"]]
-    kept.sort(key=lambda j: (1 if j["over_level"] else 0, -(j.get("match_score") or 0)))
+    kept.sort(key=lambda j: (1 if j["over_level"] else 0,          # in-level group first
+                             _Desc(j.get("posted_at")),            # then freshest
+                             -(j.get("match_score") or 0)))        # then Fit
     return kept

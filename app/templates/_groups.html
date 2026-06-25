@@ -1,0 +1,9 @@
+{# ── _groups.html — loop wrapper, swap target for HTMX filter refreshes ─── #}
+{% if groups %}
+  {% for g in groups %}{% include "_company_group.html" %}{% endfor %}
+{% else %}
+<div style="text-align:center;padding:64px 24px;color:rgb(var(--c-muted))">
+  <p style="font-size:1.05rem;font-weight:700;margin-bottom:6px">No companies match</p>
+  <p style="font-size:13px">Try clearing the filters or paste people into the drawer.</p>
+</div>
+{% endif %}

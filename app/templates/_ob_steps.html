@@ -34,6 +34,9 @@
                   hx-post="/onboarding/recency"
                   hx-trigger="change"
                   hx-swap="none">
+            <option value="r900"     {{ 'selected' if onb and onb.recency_tpr == 'r900' }}>Past 15 minutes</option>
+            <option value="r3600"    {{ 'selected' if onb and onb.recency_tpr == 'r3600' }}>Past 1 hour</option>
+            <option value="r14400"   {{ 'selected' if onb and onb.recency_tpr == 'r14400' }}>Past 4 hours</option>
             <option value="r86400"   {{ 'selected' if not onb or (onb.recency_tpr or 'r86400') == 'r86400' }}>Past 24 hours</option>
             <option value="r172800"  {{ 'selected' if onb and onb.recency_tpr == 'r172800' }}>Past 48 hours</option>
             <option value="r604800"  {{ 'selected' if onb and onb.recency_tpr == 'r604800' }}>Past week</option>

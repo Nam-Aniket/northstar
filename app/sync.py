@@ -202,7 +202,7 @@ def _sync_jobs(con: sqlite3.Connection, now: str) -> int:
             "company_domain":      row.get("company_domain", ""),
             "required_skills":     row.get("required_skills", ""),
             "preferred_skills":    row.get("preferred_skills", ""),
-            "jd_posted_date":      row.get("jd_posted_date", ""),
+            "jd_posted_date":      row.get("jd_posted_date") or row.get("posted_date", ""),
             "jd_salary":           row.get("jd_salary", ""),
             "jd_employment_type":  row.get("jd_employment_type", ""),
             "authenticity_status": row.get("authenticity_status", ""),

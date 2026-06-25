@@ -146,6 +146,16 @@ class TestApplyForMeView(unittest.TestCase):
         senior = next(j for j in out if j["role_title"] == "Senior Data Analyst")
         self.assertFalse(senior["over_level"])
 
+    def test_in_level_sorted_by_freshness_then_score(self):
+        # Among in-level on-target jobs, the fresher posted_at wins even with a
+        # lower Fit score.
+        jobs = [
+            {"role_title": "Data Analyst", "match_score": 90, "posted_at": "2026-06-20"},
+            {"role_title": "Data Analyst", "match_score": 50, "posted_at": "2026-06-25"},
+        ]
+        out = relevance.apply_for_me_view(jobs, self.profile)
+        self.assertEqual([j["match_score"] for j in out], [50, 90])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -472,8 +472,13 @@ class SuperpoweredCrawlerFinal(LocalCrawler):
         started = time.time()
         result = FetchResult(url=url)
 
+        # Recency-windowed endpoints (e.g. LinkedIn job search) MUST be fetched live
+        # every run — caching them replays stale results and hides genuinely new jobs.
+        # This guard is permanent: it holds even if a caller leaves cache_enabled=True.
+        is_volatile = ("seeMoreJobPostings" in url) or ("/jobs-guest/jobs/api/" in url)
+
         # 1. Cache hit?
-        if self.cache_enabled and self.disk_cache is not None:
+        if self.cache_enabled and self.disk_cache is not None and not is_volatile:
             cached = self.disk_cache.get(url)
             if cached is not None:
                 result.final_url = cached.get("final_url", url)
@@ -526,7 +531,7 @@ class SuperpoweredCrawlerFinal(LocalCrawler):
         result.elapsed_ms = int((time.time() - started) * 1000)
 
         # 5. cache successful responses
-        if self.cache_enabled and self.disk_cache is not None and result.text and not result.error:
+        if self.cache_enabled and self.disk_cache is not None and result.text and not result.error and not is_volatile:
             self.disk_cache.put(url, {
                 "final_url": result.final_url or url,
                 "status": result.status,

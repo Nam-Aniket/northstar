@@ -44,6 +44,11 @@ templates.env.filters["swd"] = lambda t: re.sub(r"(\d+)", r"<b>\1</b>", _html.es
 templates.env.filters["urlk"] = lambda k: urllib.parse.quote(k or "", safe="")
 templates.env.filters["domid"] = lambda k: re.sub(r"[^A-Za-z0-9_-]", "-", k or "")
 templates.env.filters["normco"] = queries.normalize_company
+# Relative "posted X ago" + just-posted highlight on job cards.
+from datetime import datetime as _dt, timezone as _tz
+from app import freshness as _freshness
+templates.env.filters["ago"] = lambda iso: _freshness.humanize_ago(iso or "", _dt.now(_tz.utc))
+templates.env.filters["isfresh"] = lambda iso: _freshness.is_just_posted(iso or "", _dt.now(_tz.utc))
 
 
 def _reldate(s):
@@ -94,7 +99,8 @@ def _card(request, job):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
          status: str = "", show_dismissed: int = 0, starred: int = 0,
-         view: str = "", day: str = "", everything: int = 0, level: str = ""):
+         view: str = "", day: str = "", everything: int = 0, level: str = "",
+         fresh: str = ""):
     con = conn()
     days = queries.available_days(con)
     # Default to the newest day so the board lands on today's batch after a Run;
@@ -104,13 +110,15 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
 
     jobs = queries.get_jobs(con, q=q or None, sector=sector or None, min_score=min_score,
                             status=status or None, show_dismissed=bool(show_dismissed),
-                            starred_only=bool(starred), view=view or None, day=effective_day)
+                            starred_only=bool(starred), view=view or None, day=effective_day,
+                            fresh=fresh or None)
     # Auto-defaulted to the newest day but nothing visible there -> fall back to all.
     if not day and effective_day and not jobs:
         current_day, effective_day = "all", None
         jobs = queries.get_jobs(con, q=q or None, sector=sector or None, min_score=min_score,
                                 status=status or None, show_dismissed=bool(show_dismissed),
-                                starred_only=bool(starred), view=view or None, day=None)
+                                starred_only=bool(starred), view=view or None, day=None,
+                                fresh=fresh or None)
 
     # "For me" smart view: default board only, unless the user clicked "Show everything".
     for_me_active = (view in ("", None)) and not everything
@@ -142,7 +150,8 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         "sectors": queries.sectors(con),
         "f": {"q": q, "sector": sector, "min_score": min_score, "status": status,
               "show_dismissed": show_dismissed, "starred": starred,
-              "view": view, "day": current_day, "everything": everything, "level": level},
+              "view": view, "day": current_day, "everything": everything, "level": level,
+              "fresh": fresh},
         "view": view,
         "for_me_active": for_me_active,
         "hidden_count": hidden_count,
@@ -942,12 +951,14 @@ def job_editor_bullets(request: Request, row_key: str, skill: str = ""):
         return HTMLResponse("Job not found", status_code=404)
     skill = (skill or "").strip()
     bullets = []
+    suggested_slot = ""
     if skill and _job_skill_ok(job, skill):
         bullets = gen.placeable_bullets_for_skill(
             _job_target(job), job.get("job_text", "") or "", skill)
+        suggested_slot = gen.best_slot_for_skill(skill)
     return templates.TemplateResponse(request, "_bullet_suggestions.html", {
         "skill": skill, "bullets": bullets, "row_key": row_key,
-        "slots": gen.EXPERIENCE_SLOTS,
+        "slots": gen.EXPERIENCE_SLOTS, "suggested_slot": suggested_slot,
     })
 
 

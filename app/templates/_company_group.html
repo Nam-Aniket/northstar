@@ -1,0 +1,103 @@
+{# ── _company_group.html — collapsible company card ────────────────────────── #}
+{% set gs = g.group_status %}
+{% set is_open = (expand_all|default(false)) or gs == 'needs_contact' or g.people_count > 0 %}
+<div class="tgroup tgroup--{{ gs }}" id="tgroup-{{ g.company_key|domid }}">
+
+  {# ── Header ──────────────────────────────────────────────────────────────── #}
+  <div class="tgroup__head"
+       role="button"
+       aria-expanded="{{ 'true' if is_open else 'false' }}"
+       aria-controls="tgbody-{{ g.company_key|domid }}"
+       data-tgroup-toggle
+       tabindex="0">
+
+    {# chevron #}
+    <svg class="tgroup__chevron" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2.5"
+         stroke-linecap="round" stroke-linejoin="round"
+         aria-hidden="true">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+
+    {# company name #}
+    <a href="/company/{{ g.company_key|urlk }}"
+       class="tgroup__name"
+       onclick="event.stopPropagation()">{{ g.company_name }}</a>
+
+    {# status pill #}
+    {% if gs == 'offer' %}
+      <span class="chip" style="color:rgb(var(--c-warn));background:rgb(var(--c-warn-soft))">
+        ★ Offer
+      </span>
+    {% elif gs == 'interview' %}
+      <span class="chip" style="color:rgb(var(--c-good-ink));background:rgb(var(--c-good-soft))">
+        Interviewing
+      </span>
+    {% elif gs == 'applied' %}
+      <span class="applied-pill">Applied</span>
+    {% elif gs == 'contacted' %}
+      <span class="chip" style="color:rgb(var(--c-good-ink));background:rgb(var(--c-good-soft))">
+        Contacted
+      </span>
+    {% elif gs == 'needs_contact' %}
+      <span class="chip" style="color:rgb(160 100 0);background:rgb(var(--c-warn-soft))">
+        ⚠ Needs contacts
+      </span>
+    {% endif %}
+
+    {# meta chips #}
+    <div class="tgroup__meta">
+      {% if g.people_count %}
+        <span class="chip">{{ g.people_count }} {{ 'person' if g.people_count == 1 else 'people' }}</span>
+      {% endif %}
+      {% if g.jobs_count %}
+        <span class="chip">{{ g.jobs_count }} {{ 'job' if g.jobs_count == 1 else 'jobs' }}</span>
+      {% endif %}
+      {% if g.last_activity %}
+        <span class="chip tip">
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          {{ g.last_activity|reldate }}
+          <span class="tip__bubble">Last activity: {{ g.last_activity[:19] }}</span>
+        </span>
+      {% endif %}
+    </div>
+
+    {# Add people button — always on the far right of the header #}
+    <button type="button" class="btn tgroup__add-btn"
+            data-add-people
+            data-company="{{ g.company_name|e }}"
+            aria-label="Add people to {{ g.company_name|e }}">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add people
+    </button>
+  </div>
+
+  {# ── Body ─────────────────────────────────────────────────────────────────── #}
+  <div class="tgroup__body {{ 'is-open' if is_open else '' }}"
+       id="tgbody-{{ g.company_key|domid }}">
+
+    {# ── People sub-list ──────────────────────────────────────────────────── #}
+    {% for p in g.people %}
+      {% include "_tperson.html" %}
+    {% endfor %}
+
+    {# ── No-contacts nudge ─────────────────────────────────────────────────── #}
+    {% if not g.people %}
+    <div class="tgroup__nudge">
+      <span style="opacity:.6">No contacts yet</span>
+      <button type="button" class="btn-open"
+              style="font-size:12px;padding:6px 14px"
+              data-add-people
+              data-company="{{ g.company_name|e }}">
+        Add people →
+      </button>
+    </div>
+    {% endif %}
+
+    {# ── Jobs sub-list ────────────────────────────────────────────────────── #}
+    {% for j in g.jobs %}
+      {% include "_tjob.html" %}
+    {% endfor %}
+
+  </div>{# /.tgroup__body #}
+</div>{# /.tgroup #}
