@@ -1,0 +1,44 @@
+{# Slide-over drawer — paste LinkedIn People OR upload CSV. CSS toggle via checkbox. #}
+<input type="checkbox" id="biz-drawer-toggle" class="drawer-checkbox" aria-hidden="true">
+<div class="drawer-overlay" onclick="document.getElementById('biz-drawer-toggle').checked=false"></div>
+<aside class="ingest-drawer" role="dialog" aria-modal="true" aria-label="Add prospects">
+  <div class="ingest-drawer__header">
+    <h2 style="font-size:1rem;font-weight:700;color:rgb(var(--c-ink))">Add prospects</h2>
+    <label for="biz-drawer-toggle" class="iconlink" style="cursor:pointer" title="Close">
+      <svg viewBox="0 0 24 24" class="w-[16px] h-[16px]" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </label>
+  </div>
+
+  <form hx-post="/business/ingest" hx-target="#biz-groups" hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful){document.getElementById('biz-drawer-toggle').checked=false}"
+        style="display:flex;flex-direction:column;gap:12px;padding:0 20px 16px">
+    <div>
+      <label class="filter-label" for="biz-paste">LinkedIn People tab paste</label>
+      <textarea id="biz-paste" name="paste" rows="8" placeholder="Paste the raw 'People' tab text…"
+                style="width:100%;font-size:12.5px;padding:10px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink));resize:vertical;font-family:inherit"></textarea>
+    </div>
+    <div>
+      <label class="filter-label" for="biz-company">Company name</label>
+      <input id="biz-company" name="company" type="text" placeholder="e.g. Globex"
+             style="width:100%;font-size:13px;padding:9px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink))">
+    </div>
+    <div>
+      <label class="filter-label" for="biz-pattern">Email pattern</label>
+      <input id="biz-pattern" name="pattern" type="text" placeholder="{first}.{last}@company.com"
+             style="width:100%;font-size:13px;padding:9px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink))">
+      <p style="font-size:11px;color:rgb(var(--c-muted));margin-top:4px">
+        Tokens: <code>{first}</code> <code>{last}</code> <code>{f}</code> <code>{l}</code>
+      </p>
+    </div>
+    <button type="submit" class="btn" style="align-self:flex-start">Parse &amp; import</button>
+  </form>
+
+  <form hx-post="/business/upload-csv" hx-target="#biz-groups" hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful){document.getElementById('biz-drawer-toggle').checked=false}"
+        style="display:flex;flex-direction:column;gap:8px;padding:14px 20px 24px;border-top:1px solid rgb(var(--c-line))">
+    <label class="filter-label" for="biz-csv">Or paste CSV — <code>company,name,title,email</code></label>
+    <textarea id="biz-csv" name="csv_text" rows="5" placeholder="company,name,title,email&#10;Globex,Ada Byte,CEO,ada@globex.com"
+              style="width:100%;font-size:12.5px;padding:10px 12px;border-radius:var(--r-md);border:1px solid rgb(var(--c-line));background:rgb(var(--c-bg));color:rgb(var(--c-ink));resize:vertical;font-family:inherit"></textarea>
+    <button type="submit" class="btn-open" style="align-self:flex-start">Import CSV</button>
+  </form>
+</aside>

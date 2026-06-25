@@ -1,0 +1,37 @@
+{# one company card (always expanded); g = group dict, biz_stage_flow in context #}
+<div class="tgroup" id="bgroup-{{ g.company_key|domid }}" data-company-scope>
+  <div class="tgroup__head" style="cursor:default">
+    <span class="tgroup__name">{{ g.company_name }}</span>
+
+    <div class="tgroup__meta">
+      <span class="chip">{{ g.prospect_count }} {{ 'prospect' if g.prospect_count == 1 else 'prospects' }}</span>
+      {% if g.priority %}
+        <span class="chip" style="color:rgb(var(--c-good-ink));background:rgb(var(--c-good-soft))">★ priority</span>
+      {% endif %}
+    </div>
+
+    {% if g.prospect_count %}
+    <button type="button" class="btn-open" data-copy-emails
+            style="font-size:12px;padding:6px 12px"
+            title="Copy every prospect email in {{ g.company_name|e }}">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy emails
+    </button>
+    {% endif %}
+
+    <button type="button" class="btn tgroup__add-btn"
+            hx-post="/business/company/{{ g.company_key|urlk }}/priority"
+            hx-vals='{"on": {{ 0 if g.priority else 1 }}}' hx-swap="none"
+            hx-on::after-request="if(event.detail.successful){let t=document.createElement('span');t.className='saved-tag';t.textContent='Saved';this.after(t);setTimeout(()=>t.remove(),1200)}"
+            title="{{ 'Remove priority flag' if g.priority else 'Flag for the deep-research outreach tier' }}">
+      {{ '★ Unflag' if g.priority else '☆ Flag priority' }}
+    </button>
+  </div>
+
+  <div class="tgroup__body is-open" id="bgbody-{{ g.company_key|domid }}">
+    {% for p in g.prospects %}{% include "_biz_prospect.html" %}{% endfor %}
+    {% if not g.prospects %}
+    <div class="tgroup__nudge"><span style="opacity:.6">No prospects yet</span></div>
+    {% endif %}
+  </div>
+</div>

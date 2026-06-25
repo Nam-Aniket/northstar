@@ -1,0 +1,33 @@
+{# single prospect sub-row; p = biz_prospects dict, biz_stage_flow in context #}
+{% set st = p.stage or 'lead' %}
+<div class="tperson" id="bprospect-{{ p.prospect_key|domid }}" data-email="{{ p.email or '' }}">
+  <div class="tperson__name">
+    <span>{{ p.name }}</span>
+    {% if p.needs_review %}<span class="review-badge" title="Check name / email">review</span>{% endif %}
+  </div>
+  <div class="tperson__title" title="{{ p.title or '' }}">{{ p.title or '—' }}</div>
+  <div>
+    <label class="sr-only" for="bs-{{ p.prospect_key|domid }}">Sales stage for {{ p.name }}</label>
+    <select id="bs-{{ p.prospect_key|domid }}" name="stage" class="tpill tpill--{{ st }}"
+            hx-post="/business/prospect/{{ p.prospect_key|urlk }}/stage"
+            hx-target="#bprospect-{{ p.prospect_key|domid }}" hx-swap="outerHTML"
+            hx-trigger="change" onclick="event.stopPropagation()">
+      {% for s in biz_stage_flow %}
+      <option value="{{ s }}" {{ 'selected' if st == s }}>{{ s|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="tperson__email">
+    {% if p.email %}<a href="mailto:{{ p.email }}" onclick="event.stopPropagation()">{{ p.email }}</a>
+    {% else %}<span style="color:rgb(var(--c-muted))">—</span>{% endif %}
+  </div>
+  <div class="tperson__notes">
+    <label class="sr-only" for="bn-{{ p.prospect_key|domid }}">Notes for {{ p.name }}</label>
+    <input id="bn-{{ p.prospect_key|domid }}" type="text" name="notes" value="{{ p.notes or '' }}"
+           placeholder="add note…" class="tnote"
+           hx-post="/business/prospect/{{ p.prospect_key|urlk }}/notes"
+           hx-trigger="change, blur" hx-swap="none"
+           hx-on::after-request="if(event.detail.successful){let t=document.createElement('span');t.className='saved-tag';t.textContent='Saved';this.after(t);setTimeout(()=>t.remove(),1500)}"
+           onclick="event.stopPropagation()">
+  </div>
+</div>
