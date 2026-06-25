@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Business · Northstar{% endblock %}
+{% block content %}
+
+<div class="flex flex-wrap items-end justify-between gap-4 mb-5 reveal">
+  <div>
+    <h1 class="page-h">Business</h1>
+    <p class="page-sub">B2B outreach — sales prospects</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <button type="button" class="btn-open" data-copy-emails title="Copy every visible prospect email">Copy all emails</button>
+    <label for="biz-drawer-toggle" class="btn" style="cursor:pointer">+ Add prospects</label>
+  </div>
+</div>
+
+{# ── Stage summary ──────────────────────────────────────────────────────────── #}
+<div class="panel reveal" style="padding:16px 20px;margin-bottom:18px;display:flex;gap:14px;flex-wrap:wrap">
+  {% for s in biz_stage_flow %}
+  <div class="kpi" style="min-width:92px;padding:10px 14px">
+    <div class="l">{{ s|title }}</div>
+    <div class="v">{{ summary[s] }}</div>
+  </div>
+  {% endfor %}
+  <div class="kpi" style="min-width:92px;padding:10px 14px">
+    <div class="l">Companies</div>
+    <div class="v">{{ summary.total_companies }}</div>
+  </div>
+</div>
+
+{# ── Toolbar ────────────────────────────────────────────────────────────────── #}
+<div class="ttoolbar reveal">
+  <div>
+    <label for="bz-q" class="filter-label">Search</label>
+    <input id="bz-q" type="text" name="q" value="{{ f.q }}" placeholder="Company or person…"
+           class="filter-select" style="max-width:220px"
+           hx-get="/business" hx-target="#biz-groups" hx-swap="innerHTML"
+           hx-trigger="keyup changed delay:300ms" hx-include="closest .ttoolbar">
+  </div>
+  <div>
+    <label for="bz-stage" class="filter-label">Stage</label>
+    <select id="bz-stage" name="stage" class="filter-select"
+            hx-get="/business" hx-target="#biz-groups" hx-swap="innerHTML"
+            hx-trigger="change" hx-include="closest .ttoolbar">
+      <option value="">All stages</option>
+      {% for s in biz_stage_flow %}
+      <option value="{{ s }}" {{ 'selected' if f.stage == s }}>{{ s|title }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+{# ── Groups (HTMX swap target) ──────────────────────────────────────────────── #}
+<div id="biz-groups" style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+  {% include "_biz_groups.html" %}
+</div>
+
+{% include "_biz_ingest_drawer.html" %}
+
+{% endblock %}

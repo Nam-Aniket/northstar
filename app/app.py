@@ -728,6 +728,102 @@ def tracker_export():
     )
 
 
+# ── Business mode (B2B outreach) ───────────────────────────────────────────────
+
+@app.get("/business", response_class=HTMLResponse)
+def business(request: Request, q: str = "", stage: str = ""):
+    con = conn()
+    groups, summary = queries.biz_groups(con)
+    con.close()
+    if q or stage:
+        ql = q.lower()
+        for g in groups:
+            g["prospects"] = [
+                p for p in g["prospects"]
+                if (not ql or ql in (p.get("name") or "").lower()
+                    or ql in (g["company_name"] or "").lower())
+                and (not stage or p.get("stage") == stage)
+            ]
+            g["prospect_count"] = len(g["prospects"])
+        groups = [g for g in groups if g["prospects"]]
+    ctx = {
+        "groups": groups, "summary": summary,
+        "f": {"q": q, "stage": stage},
+        "biz_stage_flow": queries.BIZ_STAGE_FLOW,
+    }
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "_biz_groups.html", ctx)
+    return templates.TemplateResponse(request, "business.html", ctx)
+
+
+@app.post("/business/ingest", response_class=HTMLResponse)
+def business_ingest(request: Request, paste: str = Form(""), company: str = Form(""),
+                    pattern: str = Form("")):
+    from linkedin_people_parser import parse_people
+    result = parse_people(paste, company, pattern)
+    con = conn()
+    company_key = queries.slugify(company)
+    all_people = list(result.people)
+    for p in result.needs_review:
+        p2 = dict(p); p2["needs_review"] = 1; all_people.append(p2)
+    for p in all_people:
+        p.setdefault("pattern", pattern)
+    counts = queries.ingest_biz_prospects(con, company_key, company, all_people)
+    groups, summary = queries.biz_groups(con)
+    con.close()
+    ctx = {"groups": groups, "summary": summary, "f": {"q": "", "stage": ""},
+           "biz_stage_flow": queries.BIZ_STAGE_FLOW}
+    toast = (f"Added {counts['added']}, {counts['needs_review']} need review."
+             if counts["added"] else "No new prospects found.")
+    return templates.TemplateResponse(request, "_biz_groups.html", ctx,
+        headers={"HX-Trigger": json.dumps({"toast": toast})})
+
+
+@app.post("/business/upload-csv", response_class=HTMLResponse)
+def business_upload_csv(request: Request, csv_text: str = Form("")):
+    con = conn()
+    counts = queries.import_biz_csv(con, csv_text)
+    groups, summary = queries.biz_groups(con)
+    con.close()
+    ctx = {"groups": groups, "summary": summary, "f": {"q": "", "stage": ""},
+           "biz_stage_flow": queries.BIZ_STAGE_FLOW}
+    toast = f"Imported {counts['added']} prospects ({counts['needs_review']} need review)."
+    return templates.TemplateResponse(request, "_biz_groups.html", ctx,
+        headers={"HX-Trigger": json.dumps({"toast": toast})})
+
+
+@app.post("/business/prospect/{prospect_key:path}/stage", response_class=HTMLResponse)
+def business_set_stage(request: Request, prospect_key: str, stage: str = Form(...)):
+    con = conn()
+    try:
+        queries.set_biz_stage(con, prospect_key, stage)
+    except ValueError:
+        con.close()
+        return HTMLResponse("bad stage", status_code=400)
+    p = queries.get_biz_prospect(con, prospect_key)
+    con.close()
+    if not p:
+        return HTMLResponse("", status_code=404)
+    return templates.TemplateResponse(request, "_biz_prospect.html",
+        {"p": p, "biz_stage_flow": queries.BIZ_STAGE_FLOW})
+
+
+@app.post("/business/prospect/{prospect_key:path}/notes", response_class=HTMLResponse)
+def business_set_notes(request: Request, prospect_key: str, notes: str = Form("")):
+    con = conn()
+    queries.set_biz_prospect_notes(con, prospect_key, notes)
+    con.close()
+    return HTMLResponse('<span class="saved-tag">Saved</span>')
+
+
+@app.post("/business/company/{company_key:path}/priority", response_class=HTMLResponse)
+def business_set_priority(request: Request, company_key: str, on: int = Form(1)):
+    con = conn()
+    queries.set_biz_priority(con, company_key, bool(on))
+    con.close()
+    return HTMLResponse('<span class="saved-tag">Saved</span>')
+
+
 @app.post("/builder/ai/summary")
 def builder_ai_summary(role: str = Form(""), details: str = Form(""), skills: str = Form("")):
     try:

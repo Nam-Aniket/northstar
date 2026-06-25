@@ -38,6 +38,7 @@
         <a href="/" class="navlink {{ 'active' if path == '/' }}">Board</a>
         <a href="/insights" class="navlink {{ 'active' if path == '/insights' }}">Insights</a>
         <a href="/tracker" class="navlink {{ 'active' if path == '/tracker' or path.startswith('/company') }}">Tracker</a>
+        <a href="/business" class="navlink {{ 'active' if path.startswith('/business') }}">Business</a>
         <a href="/builder" class="navlink {{ 'active' if path == '/builder' }}">Builder</a>
         <a href="/onboarding" class="navlink {{ 'active' if path == '/onboarding' }}">Setup</a>
       </nav>
@@ -83,6 +84,28 @@
       w.appendChild(n);
       setTimeout(function () { n.classList.add('toast-out'); }, 1700);
       setTimeout(function () { n.remove(); }, 2100);
+    });
+
+    /* Copy-all-emails: gathers data-email from the nearest [data-company-scope]
+       (or the whole page when none), de-dupes, and writes them comma-separated to
+       the clipboard. Shared by the job tracker and Business mode. Delegated so it
+       survives HTMX swaps. */
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-copy-emails]');
+      if (!btn) return;
+      var scope = btn.closest('[data-company-scope]') || document;
+      var emails = Array.prototype.map.call(
+          scope.querySelectorAll('[data-email]'),
+          function (el) { return (el.getAttribute('data-email') || '').trim(); })
+        .filter(Boolean);
+      emails = Array.from(new Set(emails));
+      if (!emails.length) return;
+      navigator.clipboard.writeText(emails.join(', ')).then(function () {
+        var orig = btn.getAttribute('data-label') || btn.textContent.trim();
+        btn.setAttribute('data-label', orig);
+        btn.textContent = 'Copied ' + emails.length;
+        setTimeout(function () { btn.textContent = orig; }, 1500);
+      });
     });
 
     /* ── Ramos motion layer ─────────────────────────────────────────────────── */

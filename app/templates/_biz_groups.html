@@ -1,0 +1,9 @@
+{# loop wrapper + empty state — HTMX swap target for Business mode #}
+{% if groups %}
+  {% for g in groups %}{% include "_biz_company.html" %}{% endfor %}
+{% else %}
+<div style="text-align:center;padding:64px 24px;color:rgb(var(--c-muted))">
+  <p style="font-size:1.05rem;font-weight:700;margin-bottom:6px">No prospects yet</p>
+  <p style="font-size:13px">Paste a company's people or upload a CSV to start your outreach list.</p>
+</div>
+{% endif %}

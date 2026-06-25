@@ -42,6 +42,7 @@ LEFT JOIN job_seen js          ON j.row_key = js.row_key
 
 STATUS_FLOW = ["new", "applied", "phone_screen", "interview", "offer", "rejected", "closed"]
 PERSON_STATUS_FLOW = ["not_contacted", "contacted", "followup_due", "replied", "closed"]
+BIZ_STAGE_FLOW = ["lead", "contacted", "replied", "meeting", "won", "lost"]
 
 
 def normalize_company(s: str) -> str:
@@ -193,6 +194,177 @@ def ingest_people(con, company_key: str, company_name: str, people: list) -> dic
     
     con.commit()
     return {"added": added, "updated": updated, "needs_review": needs_review, "skipped": skipped}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Business mode (B2B outreach) — isolated from the job-hunt contact store.
+# Reads/writes only biz_companies + biz_prospects. Reuses the shared parser.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def ingest_biz_prospects(con, company_key: str, company_name: str, people: list) -> dict:
+    """Upsert sales prospects into biz_prospects + ensure a biz_companies row.
+    ON CONFLICT preserves stage and notes (workflow state). Mirrors ingest_people
+    but writes the isolated business tables.
+    Returns {added, updated, needs_review, skipped}."""
+    now = _now()
+    added = updated = needs_review = skipped = 0
+    seen_emails = set()
+
+    con.execute("""
+        INSERT INTO biz_companies (company_key, company_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(company_key) DO UPDATE SET company_name=excluded.company_name,
+                                               updated_at=excluded.updated_at
+    """, (company_key, company_name, now, now))
+
+    for person in people:
+        name = person.get("name", "")
+        title = person.get("title", "")
+        email = person.get("email", "")
+        is_review = person.get("needs_review", 0)
+        pattern = person.get("pattern", "")
+        if not name or not email:
+            continue
+        if email in seen_emails:
+            skipped += 1
+            continue
+        seen_emails.add(email)
+        existing = con.execute(
+            "SELECT prospect_key FROM biz_prospects WHERE email=? AND company_key=?",
+            (email, company_key)).fetchone()
+        if existing:
+            con.execute("""
+                UPDATE biz_prospects SET title=?, pattern=?, updated_at=?
+                WHERE email=? AND company_key=?
+            """, (title, pattern, now, email, company_key))
+            updated += 1
+        else:
+            prospect_key = f"{company_key}|{slugify(name)}"
+            con.execute("""
+                INSERT OR IGNORE INTO biz_prospects
+                (prospect_key, company_key, company_name, name, title, email, pattern,
+                 stage, notes, needs_review, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (prospect_key, company_key, company_name, name, title, email, pattern,
+                  "lead", "", is_review, now, now))
+            added += 1
+            if is_review:
+                needs_review += 1
+    con.commit()
+    return {"added": added, "updated": updated, "needs_review": needs_review, "skipped": skipped}
+
+
+def import_biz_csv(con, csv_text: str) -> dict:
+    """Import prospects from CSV text. Recognised headers (case-insensitive):
+    company, name, title, email (pattern optional). Rows missing an email are KEPT
+    but flagged needs_review. Never hard-fails on a bad row. Returns aggregate counts."""
+    import csv as _csv
+    import io as _io
+    reader = _csv.DictReader(_io.StringIO(csv_text))
+    norm = {(h or "").strip().lower(): h for h in (reader.fieldnames or [])}
+    by_company: dict[str, list] = {}
+    company_names: dict[str, str] = {}
+    for row in reader:
+        try:
+            company = (row.get(norm.get("company", ""), "") or "").strip()
+            name = (row.get(norm.get("name", ""), "") or "").strip()
+            title = (row.get(norm.get("title", ""), "") or "").strip()
+            email = (row.get(norm.get("email", ""), "") or "").strip()
+            pattern = (row.get(norm.get("pattern", ""), "") or "").strip()
+        except Exception:
+            continue
+        if not company or not name:
+            continue
+        key = slugify(company)
+        company_names[key] = company
+        by_company.setdefault(key, []).append(
+            {"name": name, "title": title, "email": email, "pattern": pattern})
+
+    total = {"added": 0, "updated": 0, "needs_review": 0, "skipped": 0}
+    now = _now()
+    for key, people in by_company.items():
+        emailed = [p for p in people if p.get("email")]
+        counts = ingest_biz_prospects(con, key, company_names[key], emailed)
+        for k in total:
+            total[k] += counts.get(k, 0)
+        # Keep emailless rows too, flagged for review (fill from a pattern later).
+        for p in people:
+            if p.get("email"):
+                continue
+            pk = f"{key}|{slugify(p['name'])}"
+            con.execute("""
+                INSERT OR IGNORE INTO biz_prospects
+                (prospect_key, company_key, company_name, name, title, email, pattern,
+                 stage, notes, needs_review, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, '', ?, 'lead', '', 1, ?, ?)
+            """, (pk, key, company_names[key], p["name"], p["title"],
+                  p.get("pattern", ""), now, now))
+            total["added"] += 1
+            total["needs_review"] += 1
+    con.commit()
+    return total
+
+
+def biz_groups(con) -> tuple[list, dict]:
+    """Return (groups, summary) for Business mode.
+    group:   {company_key, company_name, priority, prospects[], prospect_count}
+    summary: per-stage counts + total_companies + total_prospects."""
+    companies: dict[str, dict] = {}
+    for r in con.execute("SELECT * FROM biz_companies ORDER BY company_name"):
+        companies[r["company_key"]] = {
+            "company_key": r["company_key"],
+            "company_name": r["company_name"] or r["company_key"],
+            "priority": r["priority"] or 0,
+            "prospects": [],
+        }
+    summary = {s: 0 for s in BIZ_STAGE_FLOW}
+    total_prospects = 0
+    for r in con.execute("SELECT * FROM biz_prospects ORDER BY company_key, name"):
+        p = dict(r)
+        stage = p.get("stage") or "lead"
+        summary[stage] = summary.get(stage, 0) + 1
+        total_prospects += 1
+        grp = companies.get(p["company_key"])
+        if grp is None:
+            grp = companies[p["company_key"]] = {
+                "company_key": p["company_key"],
+                "company_name": p["company_name"] or p["company_key"],
+                "priority": 0, "prospects": [],
+            }
+        grp["prospects"].append(p)
+    groups = list(companies.values())
+    for g in groups:
+        g["prospect_count"] = len(g["prospects"])
+    groups.sort(key=lambda g: (-g["priority"], (g["company_name"] or "").lower()))
+    summary["total_companies"] = len(groups)
+    summary["total_prospects"] = total_prospects
+    return groups, summary
+
+
+def set_biz_stage(con, prospect_key: str, stage: str) -> None:
+    if stage not in BIZ_STAGE_FLOW:
+        raise ValueError(f"unknown stage: {stage}")
+    con.execute("UPDATE biz_prospects SET stage=?, updated_at=? WHERE prospect_key=?",
+                (stage, _now(), prospect_key))
+    con.commit()
+
+
+def set_biz_priority(con, company_key: str, on: bool) -> None:
+    con.execute("UPDATE biz_companies SET priority=?, updated_at=? WHERE company_key=?",
+                (1 if on else 0, _now(), company_key))
+    con.commit()
+
+
+def set_biz_prospect_notes(con, prospect_key: str, notes: str) -> None:
+    con.execute("UPDATE biz_prospects SET notes=?, updated_at=? WHERE prospect_key=?",
+                (notes or "", _now(), prospect_key))
+    con.commit()
+
+
+def get_biz_prospect(con, prospect_key: str) -> dict | None:
+    r = con.execute("SELECT * FROM biz_prospects WHERE prospect_key=?",
+                    (prospect_key,)).fetchone()
+    return dict(r) if r else None
 
 
 def tracker_table(con, q=None, company=None, status=None, sort=None, dir=None) -> list[dict]:
@@ -507,10 +679,13 @@ def tracker_groups(con, q='', status='', app_status='', needs_contacts_only=Fals
         if (p.get("created_at") or "") >= week_ago
     )
 
+    companies_with_people = sum(1 for ck in companies if people_by_company.get(ck))
+
     stats = {
         "total_companies": total_companies,
         "companies_contacted": companies_contacted,
         "companies_applied": companies_applied,
+        "companies_with_people": companies_with_people,
         "people_total": people_total,
         "added_this_week": added_this_week,
         "archived_count": archived_count,
@@ -1061,6 +1236,27 @@ def company_detail(con, company_key: str) -> dict:
     for p in con.execute("SELECT * FROM manual_people WHERE company_key=?", (company_key,)):
         if p["person_key"] not in seen_keys:
             people_rows.append(_person_row(p, ps_map.get(p["person_key"]), drafts, outr, is_manual=True))
+            seen_keys.add(p["person_key"])
+    # Unified contact store: the LinkedIn-People ingest writes tracker_people, which
+    # the legacy company view never read (the Prophix-shows-0-contacts bug).
+    for p in con.execute("SELECT * FROM tracker_people WHERE company_key=?", (company_key,)):
+        if p["person_key"] in seen_keys:
+            continue
+        seen_keys.add(p["person_key"])
+        people_rows.append({
+            "person_key":      p["person_key"],
+            "company_key":     p["company_key"],
+            "name":            p["name"],
+            "role":            p["title"] or "",
+            "email":           p["email"] or "",
+            "has_email":       bool(p["email"]),
+            "linkedin_url":    "",
+            "draft_state":     "",
+            "replied":         False,
+            "outreach_status": p["outreach_status"] or "not_contacted",
+            "contacted_at":    "",
+            "is_manual":       False,
+        })
     # Fetch scored jobs whose normalized company matches this company_key
     job_rows = [
         _shape(r) for r in con.execute(JOB_SELECT).fetchall()

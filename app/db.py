@@ -149,6 +149,33 @@ def init_schema(con: sqlite3.Connection) -> None:
             updated_at      TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_tracker_people_company ON tracker_people(company_key);
+
+        -- Business mode (B2B outreach): isolated from the job-hunt contact store.
+        CREATE TABLE IF NOT EXISTS biz_companies (
+            company_key  TEXT PRIMARY KEY,
+            company_name TEXT,
+            domain       TEXT,
+            website      TEXT,
+            priority     INTEGER DEFAULT 0,
+            notes        TEXT DEFAULT '',
+            created_at   TEXT,
+            updated_at   TEXT
+        );
+        CREATE TABLE IF NOT EXISTS biz_prospects (
+            prospect_key TEXT PRIMARY KEY,
+            company_key  TEXT,
+            company_name TEXT,
+            name         TEXT,
+            title        TEXT,
+            email        TEXT,
+            pattern      TEXT,
+            stage        TEXT DEFAULT 'lead',
+            notes        TEXT DEFAULT '',
+            needs_review INTEGER DEFAULT 0,
+            created_at   TEXT,
+            updated_at   TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_biz_prospects_company ON biz_prospects(company_key);
     """)
     con.commit()
 
