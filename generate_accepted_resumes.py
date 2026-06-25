@@ -293,6 +293,46 @@ def placeable_bullets_for_skill(target: dict, jd_text: str, skill: str) -> list[
     return out
 
 
+def best_slot_for_skill(skill: str, fact_bank: dict | None = None,
+                        experience_slots: list | None = None,
+                        group_for=None) -> str:
+    """Best-fit experience slot for a (possibly not-yet-evidenced) skill.
+
+    Ranks each slot by how much its existing fact-bank bullets already evidence
+    the skill or its taxonomy group (a role that already proves ML is the natural
+    home for an ML line); ties go to the most recent role (first slot); falls back
+    to the most recent role when nothing overlaps. Pure + deterministic.
+
+    `group_for` defaults to ontology.group_for; injectable for testing.
+    """
+    bank = FACT_BANK if fact_bank is None else fact_bank
+    slots_src = EXPERIENCE_SLOTS if experience_slots is None else experience_slots
+    slots = [s for _, s in slots_src]
+    if not slots:
+        return ""
+    if group_for is None:
+        import ontology
+        group_for = ontology.group_for
+
+    skill_lc = (skill or "").strip().lower()
+    target_group = group_for(skill) if skill_lc else "General"
+
+    def slot_score(slot: str) -> int:
+        score = 0
+        for b in bank.get(slot, []):
+            for ev in b.get("evidences", []):
+                ev_lc = ev.strip().lower()
+                if ev_lc == skill_lc:
+                    score += 2
+                elif target_group != "General" and group_for(ev) == target_group:
+                    score += 1
+        return score
+
+    # Higher score wins; on a tie the earliest slot (most recent role) wins.
+    # When every score is 0 this also returns the most recent role.
+    return max(slots, key=lambda s: (slot_score(s), -slots.index(s)))
+
+
 def select_bullets(slot: str, jd_hits: Dict[str, Dict]) -> List[Dict]:
     """Greedy weighted set-cover: pick the bullets that add the most uncovered
     JD-term importance, up to the slot budget. Deterministic. Selected bullets

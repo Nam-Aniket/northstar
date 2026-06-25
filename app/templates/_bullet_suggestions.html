@@ -18,9 +18,9 @@
   <form class="writeonce" data-skill="{{ skill }}" data-row="{{ row_key }}">
     <textarea class="filter-select wo-text" rows="2"
               placeholder="e.g. Built CI/CD pipelines in GitHub Actions, cutting deploy time 40%."></textarea>
-    <label class="filter-label" style="margin-top:8px;display:block">Which role does this belong to?</label>
+    <label class="filter-label" style="margin-top:8px;display:block">Which role does this belong to?{% if suggested_slot %} <span class="text-leaf">(suggested for you)</span>{% endif %}</label>
     <select class="filter-select wo-slot">
-      {% for header, slot in slots %}<option value="{{ slot }}">{{ header }}</option>{% endfor %}
+      {% for header, slot in slots %}<option value="{{ slot }}"{% if slot == suggested_slot %} selected{% endif %}>{{ header }}</option>{% endfor %}
     </select>
     <button type="button" class="wo-save btn-apply" style="margin-top:8px">Save &amp; add</button>
   </form>
