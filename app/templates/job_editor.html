@@ -333,9 +333,9 @@
     if (!html.length) html.push('<p style="color:#999;font-size:12px;text-align:center;margin-top:40px">Start filling in the form to see your resume here.</p>');
 
     document.getElementById('preview-paper').innerHTML = html.join('');
-    layoutPaper();
     updateCoverage(d);
     renderCover();
+    layoutPaper();   // measure after BOTH papers are up to date
   }
 
   /* ── Live keyword coverage ──────────────────────────────────────────────────── */
@@ -375,11 +375,15 @@
 
   /* ── Layout pass: scale paper + page-break markers ──────────────────────────── */
   var A4_H = 1122, A4_W = 794;
+  var activeTab = 'resume';
   function layoutPaper() {
     var scroll = document.getElementById('paper-scroll');
     var scaler = document.getElementById('paper-scaler');
-    var paper = document.getElementById('preview-paper');
-    if (!scroll || !scaler || !paper) return;
+    // Measure the VISIBLE paper, not always the resume. A render fired while the
+    // cover-letter tab is active would otherwise measure the hidden resume
+    // (offsetHeight 0) and collapse the scaler to a sliver.
+    var paper = document.getElementById(activeTab === 'cover' ? 'cover-paper' : 'preview-paper');
+    if (!scroll || !scaler || !paper || paper.offsetParent === null) return;
     var pad = 56;
     var S = Math.min(1, (scroll.clientWidth - pad) / A4_W);
     scaler.style.transformOrigin = 'top left';
@@ -387,7 +391,7 @@
     scaler.style.width = Math.round(A4_W * S) + 'px';
     scaler.style.height = Math.round(paper.offsetHeight * S) + 'px';
 
-    var old = paper.querySelectorAll('.pagebreak');
+    var old = document.querySelectorAll('#preview-paper .pagebreak, #cover-paper .pagebreak');
     for (var i = 0; i < old.length; i++) old[i].remove();
     var pages = Math.ceil(paper.offsetHeight / A4_H);
     for (var k = 1; k < pages; k++) {
@@ -508,11 +512,13 @@
 
   function showTab(which) {
     var isCover = which === 'cover';
+    activeTab = which;
     document.getElementById('preview-paper').style.display = isCover ? 'none' : 'block';
     document.getElementById('cover-paper').style.display = isCover ? 'block' : 'none';
     document.getElementById('tab-resume').classList.toggle('is-active', !isCover);
     document.getElementById('tab-cover').classList.toggle('is-active', isCover);
-    if (isCover) renderCover(); else layoutPaper();
+    if (isCover) renderCover();
+    layoutPaper();   // re-layout for the now-visible paper
   }
   document.getElementById('tab-resume').addEventListener('click', function () { showTab('resume'); });
   document.getElementById('tab-cover').addEventListener('click', function () { showTab('cover'); });
