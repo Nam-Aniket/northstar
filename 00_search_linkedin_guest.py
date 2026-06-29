@@ -120,6 +120,8 @@ def main():
     ap.add_argument("--delay", type=float, default=1.3, help="Seconds between page requests.")
     ap.add_argument("--no-append", action="store_true",
                     help="Overwrite --out instead of merging into existing rows.")
+    ap.add_argument("--no-seek", action="store_true",
+                    help="Skip the best-effort Seek.com.au second source.")
     args = ap.parse_args()
 
     # Search result pages are recency-windowed (f_TPR) and the URL is byte-identical
@@ -143,6 +145,22 @@ def main():
         deduped.setdefault(csv_merge.row_key(cd), cd)
     new_rows = list(deduped.values())
     print(f"[total] {len(all_cards)} cards -> {len(new_rows)} unique jobs")
+
+    # Best-effort second source: Seek.com.au. Mapped into the same schema and
+    # merged here so the rest of the pipeline is source-agnostic. Never fatal:
+    # if Seek is blocked / returns 0, the run continues on LinkedIn alone.
+    if not args.no_seek:
+        try:
+            import seek_source
+            seek_rows = seek_source.fetch_seek_rows(args.keywords, args.location)
+            if seek_rows:
+                merged = csv_merge.merge_csv_on_key(new_rows, seek_rows, csv_merge.row_key)
+                print(f"[seek] +{len(seek_rows)} Seek postings -> {len(merged)} unique after merge")
+                new_rows = merged
+            else:
+                print("[seek-warning] Seek returned 0 postings (blocked, no matches, or robots-disallowed)")
+        except Exception as e:
+            print(f"[seek-warning] Seek step skipped: {e}")
 
     out = Path(args.out)
     if out.exists() and not args.no_append:

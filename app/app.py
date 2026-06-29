@@ -127,7 +127,8 @@ def home(request: Request, q: str = "", sector: str = "", min_score: int = 0,
         profile = relevance.target_profile(con)
         override = _LEVEL_OVERRIDE.get(level)  # None when level is "" / "auto" / unknown
         before = len(jobs)
-        jobs = relevance.apply_for_me_view(jobs, profile, override_rank=override)
+        jobs = relevance.apply_for_me_view(jobs, profile, override_rank=override,
+                                           cand_years=config.years_experience)
         hidden_count = before - len(jobs)
 
     # prev/next day navigation (days is descending: index 0 = newest)

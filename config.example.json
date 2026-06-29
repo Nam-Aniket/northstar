@@ -15,7 +15,10 @@
     "exclude_companies": []
   },
   "search": {
-    "target_keywords": ["analyst", "data analyst"],
+    "target_keywords": [
+      "analyst",
+      "data analyst"
+    ],
     "target_location": "Remote",
     "recency_tpr": "r86400"
   }

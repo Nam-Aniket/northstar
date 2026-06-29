@@ -10,6 +10,7 @@
       {% if j.low_confidence %}<span class="tip"><span class="chip" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">~ uncertain</span><span role="tooltip" class="tip__bubble">Few recognised requirements - Fit is uncertain.</span></span>{% endif %}
       {% if j.status and j.status not in ('new','applied') %}<span class="chip capitalize" style="color:rgb(var(--c-accent-d));background:rgb(var(--c-accent-soft))">{{ j.status.replace('_',' ') }}</span>{% endif %}
       {% if j.over_level %}<span class="chip capitalize" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">{{ j.seniority_label }}</span>{% endif %}
+      {% if j.over_experience %}<span class="tip"><span class="chip" style="color:rgb(var(--c-ink2));background:rgb(var(--c-warn-soft))">{{ j.req_years }}+ yrs</span><span role="tooltip" class="tip__bubble">Asks for {{ j.req_years }}+ years - more than your experience.</span></span>{% endif %}
     </div>
   </div>
 
