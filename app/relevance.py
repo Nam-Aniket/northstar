@@ -75,6 +75,44 @@ def title_tokens(title: str) -> set[str]:
     return {w for w in _TOKEN_RE.findall((title or "").lower()) if w not in _STOP}
 
 
+# Role-type words that appear across many domains. They show up in the user's own
+# targets too (e.g. "Data Engineer"), but on their own they must NOT qualify an
+# off-domain role like "Software Engineer" as on-target. So they are excluded from
+# the relevance ANCHOR set. (Seniority/filler are already stripped by title_tokens.)
+_GENERIC_ROLE_WORDS = {
+    "engineer", "engineering", "developer", "programmer",
+    "consultant", "specialist", "architect", "advisor", "technician",
+}
+
+
+def anchor_tokens(title: str) -> set[str]:
+    """Domain-anchor tokens of a title: title_tokens minus generic role words.
+
+    This is what relevance matching compares, so 'Software Engineer' ({software})
+    can't match a 'Data Engineer' target on the shared generic word 'engineer'
+    alone — it must share a real domain anchor (data / analyst / scientist / ...).
+    """
+    return title_tokens(title) - _GENERIC_ROLE_WORDS
+
+
+# Stated minimum years-of-experience. Only "N+ years" or "minimum/at least N
+# years" count; bare "5 years" is descriptive prose, not a stated requirement.
+_YEARS_PLUS_RE = re.compile(r"\b(\d{1,2})\s*\+\s*years?\b", re.IGNORECASE)
+_YEARS_MIN_RE = re.compile(
+    r"\b(?:minimum|min\.?|at least)\s+(?:of\s+)?(\d{1,2})\s*\+?\s*years?\b",
+    re.IGNORECASE,
+)
+
+
+def required_years(text: str) -> int | None:
+    """Highest stated minimum years-of-experience in the text, or None."""
+    if not text:
+        return None
+    yrs = [int(m.group(1)) for m in _YEARS_PLUS_RE.finditer(text)]
+    yrs += [int(m.group(1)) for m in _YEARS_MIN_RE.finditer(text)]
+    return max(yrs) if yrs else None
+
+
 def target_profile(con) -> dict:
     """Derive the user's relevance profile from tracked_positions.
 
@@ -84,48 +122,65 @@ def target_profile(con) -> dict:
     rows = con.execute("SELECT title FROM tracked_positions").fetchall()
     titles = [r["title"] for r in rows if r["title"]]
     tokens: set[str] = set()
+    anchors: set[str] = set()
     max_rank = MID_RANK
     for t in titles:
         tokens |= title_tokens(t)
+        anchors |= anchor_tokens(t)
         max_rank = max(max_rank, parse_seniority(t)[1])
     return {
         "title_tokens": tokens,
+        "anchor_tokens": anchors,
         "tracked_titles": titles,
         "max_seniority_rank": max_rank,
     }
 
 
-def classify_job(job: dict, profile: dict, cap: int) -> dict:
-    """Merge relevance + seniority flags onto a shaped job dict and return it.
+def classify_job(job: dict, profile: dict, cap: int, cand_years: int | None = None) -> dict:
+    """Merge relevance + seniority + experience flags onto a shaped job and return it.
 
-    on_target: title shares >=1 meaningful token with the tracked titles.
+    on_target: title shares >=1 domain ANCHOR token with the tracked titles.
                If the profile is unconfigured (no tokens), everything is on_target.
     over_level: seniority rank exceeds `cap`.
+    over_experience: the JD asks for more years than `cand_years` (None -> never).
     """
     title = job.get("role_title", "")
     label, rank = parse_seniority(title)
-    targets = profile.get("title_tokens") or set()
+    # Match on domain anchors (generic role words excluded). Fall back to deriving
+    # anchors from title_tokens when a caller passes a profile without the key.
+    targets = profile.get("anchor_tokens")
+    if targets is None:
+        targets = profile.get("title_tokens", set()) - _GENERIC_ROLE_WORDS
     if targets:
-        on_target = bool(title_tokens(title) & targets)
+        on_target = bool(anchor_tokens(title) & targets)
+    elif profile.get("title_tokens"):
+        # Tracked titles were ALL generic role words (rare) -> raw token overlap.
+        on_target = bool(title_tokens(title) & profile["title_tokens"])
     else:
-        on_target = True
+        on_target = True  # unconfigured profile hides nothing
+    req_y = required_years(job.get("job_text") or "")
     job["on_target"] = on_target
     job["seniority_label"] = label
     job["seniority_rank"] = rank
     job["over_level"] = rank > cap
+    job["req_years"] = req_y
+    job["over_experience"] = bool(
+        cand_years is not None and req_y is not None and req_y > cand_years)
     return job
 
 
-def apply_for_me_view(jobs: list[dict], profile: dict, override_rank: int | None = None) -> list[dict]:
-    """Hide off-target jobs, sink over-level jobs, sort for the For-me board.
+def apply_for_me_view(jobs: list[dict], profile: dict, override_rank: int | None = None,
+                      cand_years: int | None = None) -> list[dict]:
+    """Hide off-target jobs, sink over-qualified jobs, sort for the For-me board.
 
-    Sort key: in-level before over-level, then freshest (posted_at) first, then
-    match_score descending. `override_rank` (None = auto) replaces the cap.
+    Sort key: well-matched before over-level/over-experience, then freshest
+    (posted_at) first, then match_score descending. `override_rank` (None = auto)
+    replaces the seniority cap; `cand_years` enables the experience flag.
     """
     cap = override_rank if override_rank is not None else profile.get("max_seniority_rank", MID_RANK)
-    classified = [classify_job(j, profile, cap) for j in jobs]
+    classified = [classify_job(j, profile, cap, cand_years) for j in jobs]
     kept = [j for j in classified if j["on_target"]]
-    kept.sort(key=lambda j: (1 if j["over_level"] else 0,          # in-level group first
+    kept.sort(key=lambda j: (1 if (j["over_level"] or j["over_experience"]) else 0,  # in-reach first
                              _Desc(j.get("posted_at")),            # then freshest
                              -(j.get("match_score") or 0)))        # then Fit
     return kept

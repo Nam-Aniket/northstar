@@ -118,6 +118,51 @@ class TestClassifyJob(unittest.TestCase):
         self.assertTrue(j["on_target"])
 
 
+class TestAnchorMatching(unittest.TestCase):
+    """Real-world leak: tracking 'Data Engineer' must NOT admit 'Software Engineer'
+    via the shared generic word 'engineer'."""
+
+    def setUp(self):
+        self.con = _seed_positions(
+            ["Data Analyst", "Business Analyst", "Data Engineer", "Data Scientist"])
+        self.profile = relevance.target_profile(self.con)
+
+    def test_anchor_tokens_drop_generic_role_words(self):
+        self.assertEqual(relevance.anchor_tokens("Software Engineer"), {"software"})
+        self.assertEqual(relevance.anchor_tokens("Data Engineer"), {"data"})
+        self.assertEqual(relevance.anchor_tokens("Backend Developer"), {"backend"})
+
+    def test_profile_anchors_exclude_engineer(self):
+        self.assertIn("data", self.profile["anchor_tokens"])
+        self.assertIn("scientist", self.profile["anchor_tokens"])
+        self.assertNotIn("engineer", self.profile["anchor_tokens"])
+
+    def test_software_engineer_off_target_even_when_tracking_data_engineer(self):
+        j = relevance.classify_job(
+            {"role_title": "Software Engineer", "match_score": 90}, self.profile, cap=2)
+        self.assertFalse(j["on_target"])
+
+    def test_machine_learning_engineer_off_target(self):
+        j = relevance.classify_job(
+            {"role_title": "Machine Learning Engineer", "match_score": 90}, self.profile, cap=2)
+        self.assertFalse(j["on_target"])
+
+    def test_backend_developer_off_target(self):
+        j = relevance.classify_job(
+            {"role_title": "Backend Developer", "match_score": 90}, self.profile, cap=2)
+        self.assertFalse(j["on_target"])
+
+    def test_data_engineer_still_on_target(self):
+        j = relevance.classify_job(
+            {"role_title": "Senior Data Engineer", "match_score": 90}, self.profile, cap=2)
+        self.assertTrue(j["on_target"])
+
+    def test_data_analyst_still_on_target(self):
+        j = relevance.classify_job(
+            {"role_title": "Data Analyst", "match_score": 90}, self.profile, cap=2)
+        self.assertTrue(j["on_target"])
+
+
 class TestApplyForMeView(unittest.TestCase):
     def setUp(self):
         self.profile = {"title_tokens": {"data", "analyst"},
@@ -155,6 +200,55 @@ class TestApplyForMeView(unittest.TestCase):
         ]
         out = relevance.apply_for_me_view(jobs, self.profile)
         self.assertEqual([j["match_score"] for j in out], [50, 90])
+
+
+class TestExperienceFlag(unittest.TestCase):
+    """Flag roles that ask for more years than the candidate has."""
+
+    profile = {"title_tokens": {"data", "analyst"}, "anchor_tokens": {"data", "analyst"},
+               "tracked_titles": ["Data Analyst"], "max_seniority_rank": 2}
+
+    def test_required_years_plus_form(self):
+        self.assertEqual(relevance.required_years("We need 5+ years of SQL."), 5)
+
+    def test_required_years_minimum_phrase(self):
+        self.assertEqual(relevance.required_years("Minimum of 7 years experience required."), 7)
+
+    def test_required_years_takes_the_max(self):
+        self.assertEqual(relevance.required_years("3+ years here; at least 8 years there."), 8)
+
+    def test_bare_years_prose_ignored(self):
+        self.assertIsNone(relevance.required_years("Over the years we grew; founded 2 years ago."))
+
+    def test_none_when_absent(self):
+        self.assertIsNone(relevance.required_years("No experience requirement stated."))
+
+    def test_over_experience_flagged(self):
+        j = relevance.classify_job(
+            {"role_title": "Data Analyst", "job_text": "Requires 6+ years.", "match_score": 70},
+            self.profile, cap=2, cand_years=3)
+        self.assertEqual(j["req_years"], 6)
+        self.assertTrue(j["over_experience"])
+
+    def test_within_experience_not_flagged(self):
+        j = relevance.classify_job(
+            {"role_title": "Data Analyst", "job_text": "Requires 2+ years.", "match_score": 70},
+            self.profile, cap=2, cand_years=3)
+        self.assertFalse(j["over_experience"])
+
+    def test_no_candidate_years_never_flags(self):
+        j = relevance.classify_job(
+            {"role_title": "Data Analyst", "job_text": "Requires 9+ years.", "match_score": 70},
+            self.profile, cap=2, cand_years=None)
+        self.assertFalse(j["over_experience"])
+
+    def test_apply_view_sinks_over_experience(self):
+        jobs = [
+            {"role_title": "Data Analyst", "job_text": "10+ years required", "match_score": 99},
+            {"role_title": "Data Analyst", "job_text": "entry friendly", "match_score": 50},
+        ]
+        out = relevance.apply_for_me_view(jobs, self.profile, cand_years=3)
+        self.assertEqual(out[-1]["job_text"], "10+ years required")  # sunk despite top score
 
 
 if __name__ == "__main__":
